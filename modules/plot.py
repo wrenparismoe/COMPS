@@ -3,8 +3,12 @@ import matplotlib.dates as mdates
 from pandas.plotting import lag_plot
 from pandas.plotting import autocorrelation_plot
 from System import *
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
 
-
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets, sharing=True)
 
 def plot_results(results: pd.DataFrame, model_name):
     etf = results.name
@@ -25,11 +29,17 @@ def plot_results(results: pd.DataFrame, model_name):
                                      line=dict(color='orange', width=3), showlegend=False))
 
     fig.add_trace(plt.Scatter(x=results.index, y=results['pred_False'], mode='markers',
-                             marker=dict(color='tomato', size=5.5), name='Predicted Incorrectly'))
+                             marker=dict(color='tomato', size=5.5), name='Pred Incorrect'))
 
     fig.add_trace(plt.Scatter(x=results.index, y=results['pred_True'], mode='markers',
                               marker=dict(color='forestgreen', size=5.5),
-                              name='Predicted Correctly'))
+                              name='Pred Correct'))
+
+    fig.update_layout(
+        title=results.name + ' | Predicted vs True Closing Price (' + model_name + ')',
+        xaxis_title='Date',
+        yaxis_title='Close Price $'
+    )
 
     if etf == etf_to_save:
         if save_plot:
@@ -44,13 +54,10 @@ def plot_results(results: pd.DataFrame, model_name):
             fig.write_image(offline_plot_path + "\{}".format(image_name), scale=100)
 
 
-    fig.update_layout(
-        title=results.name + ' | Predicted vs True Closing Price (' + model_name + ')',
-        xaxis_title='Date',
-        yaxis_title='Close Price $'
-    )
+    app.layout = html.Figure([dcc.Graph(figure=fig, id='forecast graph')])
+
     if show_plot:
-        fig.show()
+            app.run_server()
 
 def plotClose(data):
     months = mdates.MonthLocator()  # get every year

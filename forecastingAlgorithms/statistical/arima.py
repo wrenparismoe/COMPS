@@ -40,9 +40,9 @@ system = SystemComponents()
 system.feature_space = 'C'
 system.processor = ''
 
-lag_obs = 5
+lag_obs = 7
 diff = 1
-window = 3
+window = 7
 order = (lag_obs, diff, window)
 # order = (0, 2, 1) # original: not good order < 50%
 
@@ -100,9 +100,6 @@ for t in market_etfs:
         pred = fit.predict(start=i, end=i+7, typ='levels')
         predictions.append(pred[i+7])
 
-
-
-
     train_pred = np.full(train_size, np.nan, dtype=np.float)
 
     train_pred = pd.Series(train_pred, index=x_train.index, name='pred')
@@ -113,7 +110,7 @@ for t in market_etfs:
     forecast_metrics = metrics_list(results.loc[test_indices], include_pred_errors)
     errors.loc[t] = forecast_metrics
 
-    if create_plot:
+    if create_plot and t == 'DIA':
         plot_results(results, model_name)
 
 print(model_name)

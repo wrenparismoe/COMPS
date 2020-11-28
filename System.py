@@ -3,9 +3,9 @@ import numpy as np
 import warnings
 import os
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # or any {'0', '1', '2'}
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
-warnings.filterwarnings("ignore")
+#warnings.filterwarnings("ignore")
 
 np.set_printoptions(edgeitems=100, linewidth=1000)
 np.set_printoptions(formatter={'float': lambda x: "{0:0.4f}".format(x)})

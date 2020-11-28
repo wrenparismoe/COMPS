@@ -102,11 +102,11 @@ if run == 'custom':
 
     #################################################################
 
-    system.feature_space = 'OHLCTAMV'
+    system.feature_space = 'C'
 
-    system.feature_engineering = 'SAE'
+    system.feature_engineering = ''
 
-    system.processor = 'PT'
+    system.processor = ''
 
     #################################################################
 
