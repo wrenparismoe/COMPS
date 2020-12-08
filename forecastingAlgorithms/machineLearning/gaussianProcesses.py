@@ -1,15 +1,22 @@
 from System import *
 
 from inputData.data import get_data
-from preprocessing.process_data import get_model_name, preprocess, train_test_split
+from preprocessing.process_data import get_model_name, preprocess, difference, invert_difference, feature_difference
 from preprocessing.feature_engineering.feature_engineering_master import select_features
+from preprocessing.feature_engineering.feature_extraction import principal_component_analysis
 from modules.evaluation import metrics_list, format_results
 from modules.plot import plot_results
+from modules.time_process import Timer
+
+from sklearn.model_selection import train_test_split
 
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, Matern, WhiteKernel
+from sklearn.gaussian_process.kernels import RBF, Matern, ConstantKernel, WhiteKernel, RationalQuadratic
+
+from scipy import stats
 
 system = SystemComponents()
+
 
 
 
@@ -28,17 +35,15 @@ if run == 'basic':
 
                 x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
-                model = GaussianProcessRegressor(kernel=Matern() + RBF(), alpha=0.01)
+                model = GaussianProcessRegressor(kernel=Matern() + RBF(), alpha=0.001)
                 model.fit(x_train, y_train)
 
-                train_pred = model.predict(x_train)
-                train_pred = pd.Series(train_pred, index=x_train.index, name='pred')
-                test_pred = model.predict(x_test)
-                test_pred = pd.Series(test_pred, index=x_test.index, name='pred')
+                y_pred = model.predict(x_test)
+                y_pred = pd.Series(y_pred, index=x_test.index, name='pred')
 
-                results = format_results(df, train_pred, test_pred, include_pred_errors)
+                results = format_results(df, y_test, y_pred)
 
-                forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+                forecast_metrics = metrics_list(results.loc[test_index])
                 errors.loc[t] = forecast_metrics
 
                 if create_plot and t == etf_to_save:
@@ -78,15 +83,15 @@ if run == 'derived':
 
                 train_pred = model.predict(x_train)
                 train_pred = pd.Series(train_pred, index=x_train.index, name='pred')
-                test_pred = model.predict(x_test)
-                test_pred = pd.Series(test_pred, index=x_test.index, name='pred')
+                y_pred = model.predict(x_test)
+                y_pred = pd.Series(y_pred, index=x_test.index, name='pred')
 
-                results = format_results(df, train_pred, test_pred, include_pred_errors)
+                results = format_results(df, train_pred, y_pred)
 
-                forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+                forecast_metrics = metrics_list(results.loc[test_index])
                 errors.loc[t] = forecast_metrics
 
-                if create_plot and t == 'QQQ':
+                if create_plot and t == etf_to_save:
                     plot_results(results, model_name)
 
             print(model_name + '          features:', len(x_train.columns))
@@ -101,55 +106,59 @@ if run == 'derived':
             else:
                 exit()
 
+
 if run == 'custom':
 
     #################################################################
 
-    system.feature_space = 'OHLCTAMV'
-
-    system.feature_engineering = 'MutualInfo'
-
-    system.processor = 'PT'
-
-    system.distribution = None
+    system = SystemComponents(feature_space='OHLCTAMV', feature_engineering='Pearson', processor='PT', distribution=None)
 
     #################################################################
 
     model_name = 'GP'
     model_name = get_model_name(model_name, system)
     for t in market_etfs:
+        print(t)
         x, y, df = get_data(t, system)
 
-        x_transformed = preprocess(x, system)
+        x_diff = feature_difference(x).dropna()
+        y_diff = difference(y).dropna()
 
-        if system.feature_engineering is not None:
-            x_transformed = select_features(x_transformed, y, system)
+        x_p = preprocess(x, system)
 
-        x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
+        if not system.feature_engineering == '':
+            x = select_features(x_p, y_diff, system)
 
-        model = GaussianProcessRegressor(kernel=Matern() + RBF(), alpha=0.01)
+
+        train_size = math.floor(len(x) * 0.75)
+        x_train, y_train = x[:train_size], y_diff[:train_size]
+        x_test, y_test = x[train_size:], y[train_size:]
+        test_index = x_test.index
+
+        x_train = preprocess(x_train, system)
+        x_test = system.fitted_processor.transform(x_test)
+
+        model = GaussianProcessRegressor(kernel=Matern() + RBF(), alpha=0.001, normalize_y=True)
         model.fit(x_train, y_train)
 
-        train_pred = model.predict(x_train)
+
+        y_pred = model.predict(x_test)
+        y_pred = pd.Series(y_pred, index=test_index, name='pred')
+        y_pred = invert_difference(y_test, y_pred)
+
+        results = format_results(df, y_test, y_pred)
 
 
-        train_pred = pd.Series(train_pred, index=x_train.index, name='pred')
-        test_pred = model.predict(x_test)
-        test_pred = pd.Series(test_pred, index=x_test.index, name='pred')
-
-        results = format_results(df, train_pred, test_pred, include_pred_errors)
-
-        forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+        forecast_metrics = metrics_list(results.loc[test_index[1:-1]])
         errors.loc[t] = forecast_metrics
 
-        if create_plot and t == 'QQQ':
+        if t == 'SPY':
             plot_results(results, model_name)
 
 
     print(model_name + '          features:', len(x_train.columns))
     print(errors)
     errors.to_clipboard(excel=True, index=False, header=False)
-
 
 
 

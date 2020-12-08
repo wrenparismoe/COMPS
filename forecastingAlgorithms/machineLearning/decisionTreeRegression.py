@@ -1,12 +1,13 @@
 from System import *
 
 from inputData.data import get_data
-from preprocessing.process_data import get_model_name, preprocess, train_test_split
+from preprocessing.process_data import get_model_name, preprocess, difference, invert_difference, feature_difference
 from preprocessing.feature_engineering.feature_engineering_master import select_features
 from modules.evaluation import metrics_list, format_results
 from modules.plot import plot_results
 
 from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import AdaBoostRegressor
 
 system = SystemComponents()
 
@@ -103,13 +104,7 @@ if run == 'custom':
 
     #################################################################
 
-    system.feature_space = 'OHLCTAMV'
-
-    system.feature_engineering = 'MutualInfo'
-
-    system.processor = 'PT'
-
-    system.distribution = None
+    system = SystemComponents(feature_space = 'OHLCTAMV', feature_engineering = 'MutualInfo', processor = 'PT')
 
     #################################################################
 
@@ -120,8 +115,7 @@ if run == 'custom':
 
         x_transformed = preprocess(x, system)
 
-
-        if system.feature_engineering is not None:
+        if not system.feature_engineering == '':
             x_transformed = select_features(x_transformed, y, system)
 
         x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
@@ -129,14 +123,12 @@ if run == 'custom':
         model = DecisionTreeRegressor(criterion='mse')
         model.fit(x_train, y_train)
 
-        train_pred = model.predict(x_train)
-        train_pred = pd.Series(train_pred, index=x_train.index, name='pred')
-        test_pred = model.predict(x_test)
-        test_pred = pd.Series(test_pred, index=x_test.index, name='pred')
+        y_pred = model.predict(x_test)
+        y_pred = pd.Series(y_pred, index=x_test.index, name='pred')
 
-        results = format_results(df, train_pred, test_pred, include_pred_errors)
+        results = format_results(df, y_test, y_pred)
 
-        forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+        forecast_metrics = metrics_list(results.loc[test_index])
         errors.loc[t] = forecast_metrics
 
         if create_plot and t == etf_to_save:
@@ -146,3 +138,11 @@ if run == 'custom':
     print(model_name + '          features:', len(x_train.columns))
     print(errors)
     errors.to_clipboard(excel=True, index=False, header=False)
+
+
+def difference(data:pd.DataFrame, interval=1):
+    return data - data.shift(interval)
+
+
+
+

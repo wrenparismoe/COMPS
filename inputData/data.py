@@ -14,9 +14,12 @@ def get_max(d :pd.DataFrame):
     maximum = max((des.loc['max']))
     return maximum
 
-def get_close_df(ticker):
-    startDate = '2015-1-01'
-    endDate = '2020-10-29'
+def get_close_df(ticker, new_data=False):
+    startDate = '2012-1-01'
+    if not new_data:
+        endDate = '2020-08-31'
+    else:
+        endDate = '2020-11-27'
 
     data = pd.DataFrame(DR(ticker, start=startDate, end=endDate, data_source='yahoo'))
 
@@ -26,9 +29,13 @@ def get_close_df(ticker):
     return data
 
 
-def get_ohlc_df(ticker):
-    startDate = '2015-1-01'
-    endDate = '2020-10-29'
+def get_ohlc_df(ticker, new_data=False):
+    startDate = '2012-1-01'
+    #startDate = '2015-01-01'
+    if not new_data:
+        endDate = '2020-08-31'
+    else:
+        endDate = '2020-11-27'
 
     data = pd.DataFrame(DR(ticker, start=startDate, end=endDate, data_source='yahoo'))
 
@@ -49,17 +56,21 @@ def get_ta_df(data: pd.DataFrame):
     return indicator_df
 
 
-def get_mv_df(indices):
+def get_mv_df(indices, new_data=False):
     api_key = '9ab1f8cf73b430491cb394ccc8ef7af3'
-
-    rows = len(indices)
+    startDate = '2012-1-01'
+    #startDate = '2015-01-01'
+    if not new_data:
+        endDate = '2020-08-31'
+    else:
+        endDate = '2020-11-27'
 
     mv_df = pd.DataFrame(np.nan, columns=['FFR', 'DXY', 'CPI'], index=indices)
 
     fred = Fred(api_key=api_key)
-    mv_df['FFR'] = fred.get_series('FEDFUNDS', observation_start='2015-01-01', observation_end='2020-10-29')
-    mv_df['DXY'] = fred.get_series('DTWEXBGS', observation_start='2015-01-01', observation_end='2020-10-29')
-    mv_df['CPI'] = fred.get_series('CPIAUCSL', observation_start='2015-01-01', observation_end='2020-10-29')
+    mv_df['FFR'] = fred.get_series('FEDFUNDS', observation_start=startDate, observation_end=endDate)
+    mv_df['DXY'] = fred.get_series('DTWEXBGS', observation_start=startDate, observation_end=endDate)
+    mv_df['CPI'] = fred.get_series('CPIAUCSL', observation_start=startDate, observation_end=endDate)
 
     mv_df['FFR'].iloc[0] = 0.12
     mv_df['CPI'].iloc[0] = 236.222
@@ -87,12 +98,12 @@ def get_mv_df(indices):
 
 
 
-def get_advanced_df(ticker):
-    data = get_ohlc_df(ticker)
+def get_advanced_df(ticker, new_data=False):
+    data = get_ohlc_df(ticker, new_data)
     ind = data.index.values
 
     ta = get_ta_df(data)
-    mv = get_mv_df(ind)
+    mv = get_mv_df(ind, new_data)
 
     advanced_df = pd.merge(ta, mv, left_index=True, right_index=True)
 
@@ -100,42 +111,101 @@ def get_advanced_df(ticker):
     return advanced_df
 
 
-def get_data(t, system: SystemComponents):
+def get_data(t, system: SystemComponents, new_data=False):
     df = None
     if system.feature_space == 'C':
         while df is None:
             try:
-                df = get_close_df(t)
+                df = get_close_df(t, new_data)
             except:
                 pass
-        df['Close_Forecast'] = df['Close'].shift(-forecast_out)
-        days = np.array([x for x in range(1, len(df.index.values) + 1)])
-        df.insert(loc=0, column='Day', value=days)
-        x = df[['Day']][:-forecast_out].copy()
+        df['y'] = df['Close'].shift(-forecast_out)
+        y = df[['Close']].shift(-1)
+        days = np.arange(start=1, stop=len(df) +1, step=1)
+        df['day'] = days
+        x = df[['day']][:-1]
+        return x, y, df
     else:
         if system.feature_space == 'OHLC':
             while df is None:
                 try:
-                    df = get_ohlc_df(t)
+                    df = get_ohlc_df(t, new_data)
                 except:
                     pass
         elif system.feature_space == 'OHLCTAMV':
             while df is None:
                 try:
-                    df = get_advanced_df(t)
+                    df = get_advanced_df(t, new_data)
                 except:
                     pass
-        df['Close_Forecast'] = df['Close'].shift(-forecast_out)
-        days = np.array([x for x in range(1, len(df.index.values) + 1)])
-        df.insert(loc=0, column='Day', value=days)
-        x = df.drop(['Close_Forecast'], 1)[:-forecast_out].copy()
+        df['y'] = df['Close'].shift(-forecast_out)
+        x = df.drop(['y'], 1)[:-forecast_out].copy()
 
-    y = df['Close_Forecast'][:-forecast_out]
+    y = df['y'][:-forecast_out]
     df.name = t
     x.name = t
     y.name = t
 
     return x, y, df
+
+
+def create_labels(data: pd.DataFrame):
+    pct_chg = data['Close'].pct_change()
+    for ind, p in pct_chg.iteritems():
+        if p < 0:
+            pct_chg.loc[ind] = 0
+        if p > 0:
+            pct_chg.loc[ind] = 1
+
+    return pct_chg
+
+def get_class_data(t, system: SystemComponents, new_data=False):
+    df = None
+    if system.feature_space == 'C':
+        while df is None:
+            try:
+                df = get_close_df(t, new_data)
+            except:
+                pass
+        labels = create_labels(df)
+        df['y'] = labels.shift(-forecast_out)
+
+
+        days = np.array([x for x in range(1, len(df.index.values) + 1)])
+        df.insert(loc=0, column='Day', value=days)
+        x = df[['Day']][:-forecast_out]
+    else:
+        if system.feature_space == 'OHLC':
+            while df is None:
+                try:
+                    df = get_ohlc_df(t, new_data)
+                except:
+                    pass
+        elif system.feature_space == 'OHLCTAMV':
+            while df is None:
+                try:
+                    df = get_advanced_df(t, new_data)
+                except:
+                    pass
+        labels = create_labels(df)
+        df['y'] = labels.shift(-forecast_out)
+        days = np.array([x for x in range(1, len(df.index.values) + 1)])
+        df.insert(loc=0, column='Day', value=days)
+        x = df.drop(['y'], 1)[:-forecast_out].copy()
+
+    y = df['y'][:-forecast_out]
+    df.name = t
+    x.name = t
+    y.name = t
+
+    return x, y, df
+
+
+
+
+
+
+
 
 
 def save_data_files():

@@ -1,11 +1,11 @@
 from System import *
 
 from inputData.data import get_data
-from preprocessing.process_data import get_model_name, preprocess
+from preprocessing.process_data import get_model_name
 from preprocessing.feature_engineering.feature_engineering_master import select_features
 from modules.evaluation import metrics_list, format_results
 from modules.plot import plot_results
-from sklearn.model_selection import train_test_split
+
 
 from tensorflow.keras.layers import Input, Dense, LeakyReLU, LSTM, Dropout, BatchNormalization
 from tensorflow.keras.models import Model
@@ -15,8 +15,11 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import plot_model
 import tensorflow as tf
 import tensorflow.keras.backend as K
-
+import math
 import pickle
+
+tf.random.set_seed(11)
+np.random.seed(11)
 
 
 system = SystemComponents()
@@ -68,104 +71,129 @@ def directional_loss(y_true, y_pred):
     return custom_loss
 
 
-# class LongSortTermMemory:
-#     def __init__(self):
-#         self.x_train = x_t
-#         self.y_train = np.array(y_t).transpose()
-#         self.x_test = x_test_t
-#         self.y_test = np.array(y_test_t).transpose()
-#         self.train_pred = None
-#         self.test_pred = None
-#         self.model = None
-#
-#     def create_model(self):
-#
-#         inputs = Input(batch_shape=batch_size, batch_input_shape=(batch_size, time_steps, self.x_train.shape[1]))
-#         x = LSTM(100, dropout=0.0, recurrent_dropout=0.0, stateful=True, return_sequences=True,
-#                  kernel_initializer='random_uniform')(inputs)
-#         x = Dropout(0.4)(x)
-#         x = LSTM(60, dropout=0.0)(x)
-#         x = Dropout(0.4)(x)
-#         x = Dense(20, activation=swish)(x)
-#         outputs = Dense(1, activation=swish)(x)
-#
-#         self.model = Model(inputs, outputs)
-#
-#     def plot_model(self):
-#         plot_model(self.model, show_shapes=True)
-#
-#     def train_model(self):
-#
-#         self.model.compile(optimizer=Adam(0.001), loss=directional_loss, metrics=['mean_absolute_percentage_error'])
-#         self.model.summary()
-#         self.model.fit(self.x_train, self.y_train, epochs=epochs, batch_size=batch_size, callbacks=[cb], shuffle=False)
-#
-#     def evaluate_model(self):
-#
-#         loss, acc = self.model.evaluate(self.x_test, self.y_test)
-#         print('training time:', round(sum(cb.logs), 4))
-#         print(f'test_loss: {loss} --> test_acc: {acc}')
-#         print(self.model.summary(), '\n')
-#
-#     def predict_model(self):
-#         train_pred = self.model.predict(self.x_train, batch_size=batch_size)
-#         train_pred = train_pred.flatten()
-#         test_pred = self.model.predict(self.x_test, batch_size=batch_size)
-#         test_pred = test_pred.flatten()
-#
-#         print(train_pred)
-#
-#         print(test_pred)
-#
-#         # self.train_pred = pd.Series(train_pred, index=self.x_train.index, name='pred')
-#         # self.test_pred = pd.Series(test_pred, index=self.x_test.index, name='pred')
 
 
 class DataGenerater:
-    def __init__(self, time_steps=3, batch_size = 32):
-        self.time_steps = time_steps
-        self.batch_size = batch_size
-        self.dict_seq = dict()
-        self.dim0 = df.shape[0] - forecast_out
-        self.dim1 = df.shape[1] - 1
+    def __init__(self, x: pd.DataFrame, y: pd.DataFrame, time_steps=3, batch_size=32, train_ratio=0.75):
+        self.x = x
+        self.y = y
         self.x_seq = None
         self.y_seq = None
-        self.indices = df.index.values
-
-    def dictionary_creator(self):
-        x_seq_step = np.full(shape=(self.dim0 - self.time_steps, self.time_steps, self.dim1), fill_value=np.nan, dtype=np.float)
-        y_seq_step = y[i] ### do samefor y
-        for i in range(self.time_steps - 1, self.dim0 - 1):
-            x_step = np.full(shape=(self.time_steps, self.dim1), fill_value=np.nan, dtype=np.float)
-            ind = self.indices[i]
-
-            for j in range(self.time_steps):
-                x_step[j] = x.iloc[i + j - (self.time_steps - 1)]
-
-            self.dict_seq[ind] = [x_step, y[i]]
-
-            x_seq_step[i - self.time_steps + 1] = x_step
-
+        self.time_steps = time_steps
+        self.batch_size = batch_size
+        self.train_ratio = train_ratio
+        self.train_size = None
+        self.processor = system.get_processor()
         self.sequence_creator()
 
     def sequence_creator(self):
-        x_seq_temp = 0
-        for date, values in self.dict_seq.items():
+        rows = self.x.shape[0]
+        cols = self.x.shape[1]
+        x_seq = []
+        y_seq = []
+        for i in range(self.time_steps, rows):
+            x_step = np.full(shape=(self.time_steps, cols), fill_value=np.nan)
+            for j in range(self.time_steps):
+                x_step[j] = self.x.iloc[i - self.time_steps + j].values
+            x_seq.append(x_step)
+            y_seq.append(self.y[i])
+
+        if not self.seq_match(x_seq, y_seq):
+            print('Data generated incorrectly')
             exit()
+
+
+        self.x_seq = np.array(x_seq, dtype='float32')
+        self.y_seq = np.reshape(np.array(y_seq, dtype='float32'), newshape=(rows-self.time_steps,))
+
+    def seq_match(self, x, y):
+        return len(x) == len(y)
+
+    def process_training(self):
+        x_train = self.x_seq[:self.train_size].copy()
+        if self.processor is None:
+            return x_train
+        else:
+            processors = {}
+            dim = x_train.shape[2]
+            for i in range(dim):
+                col = self.x_seq[:, :, i]
+                processors[i] = self.processor.fit(col)
+                x_train[:, :, i] = processors[i].transform(col)
+            return x_train
+
+    def get_step(self, step):
+        x_train = self.x_seq[:self.train_size + step].copy()
+        x_test = self.x_seq[self.train_size + step].copy()
+        print('train')
+        print(x_train)
+        print('test')
+        print(x_test)
+        print(len(self.x))
+        exit()
+        if self.processor is None:
+            return x_train
+
+        else:
+            processors = {}
+            dim = x_train.shape[2]
+            for i in range(dim):
+                train_col = x_train[:, :, i]
+                test_col = x_test[:, :, i]
+                processors[i] = self.processor.fit(train_col)
+                x_train[:, :, i] = processors[i].transform(train_col)
+                x_test[:, :, i] = processors[i].transform(test_col)
+
+            return x_train, x_test
+
+
+class LongSortTermMemory:
+    def __init__(self, time_steps=3, batch_size=32):
+        self.time_steps = time_steps
+        self.batch_size = batch_size
+        self.model = None
+
+    def create_model(self):
+        inputs = Input(batch_shape=self.batch_size, batch_input_shape=(self.batch_size, x_train.shape[1], x_train.shape[2]))
+        x = LSTM(100, activation=relu)(inputs)
+        x = Dropout(0.2)(x)
+        # x = LSTM(100, activation=relu)(x)
+        # x = Dropout(0.2)(x)
+        # x = Dense(100, activation=swish)(x)
+        outputs = Dense(1)(x)
+
+        self.model = Model(inputs, outputs)
+
+    def plot_model(self):
+        plot_model(self.model, show_shapes=True)
+
+    def train_model(self):
+        file_path = 'saved_models/model_epoch_{epoch:02d}.hdf5'
+        cp = ModelCheckpoint(filepath=file_path, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+
+        self.model.compile(optimizer=Adam(0.001), loss='mean_squared_error', metrics=['mean_absolute_percentage_error'])
+        self.model.summary()
+        self.model.fit(x_train, y_train, epochs=100, batch_size=self.batch_size, callbacks=[cp],
+                       validation_data=(x_test, y_test), verbose=1, shuffle=False)
+
+    def evaluate_model(self):
+
+        loss, acc = self.model.evaluate(x_test, y_test)
+        print(f'test_loss: {loss} --> test_acc: {acc}')
+        print(self.model.summary(), '\n')
+
+    def predict_model(self):
+        return self.model.predict(x_test)
 
 
 
 
 if __name__ == '__main__':
-    if run == 'custom':
+    if run == 'walk_forward':
 
         #################################################################
 
-        system.feature_space = 'OHLC'
-
-        system.feature_engineering = ''
-
-        system.processor = 'MMS'
+        system = SystemComponents(feature_space='OHLC', feature_engineering='', processor='MMS', distribution=None)
 
         #################################################################
 
@@ -177,13 +205,42 @@ if __name__ == '__main__':
         for t in market_etfs:
             x, y, df = get_data(t, system)
 
-            data = DataGenerater()
-            data.dictionary_creator()
+            DG = DataGenerater(x, y)
 
-            exit()
+            x = DG.process_training()
+            y = DG.y_seq
+            train_size = math.floor(x.shape[0] * 0.75)
+
+
+            x_train = x[:train_size]
+            y_train = y[:train_size]
+            x_test = x[train_size:]
+            y_test = y[train_size:]
+
+            lstm = LongSortTermMemory()
+            lstm.create_model()
+            lstm.train_model()
+            lstm.evaluate_model()
+            y_pred = lstm.predict_model()
+
+            results = pd.DataFrame(y_test.flatten(), columns=['y_test'])
+            results['y_pred'] = y_pred.flatten()
+
+            print(results)
+
+            # for i in range(x_test.shape[0]):
+            #     x_train, x_test = DG.get_step(i)
+            #     print('train')
+            #     print(x_train)
+            #     print('test')
+            #     print(x_test)
+            #     exit()
+            #     #lstm.train_model()
+
+
 
 """
-            x_transformed = preprocess(x, system)
+            
 
             if system.feature_engineering != '':
                 x_transformed = select_features(x_transformed, y, system)

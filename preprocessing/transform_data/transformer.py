@@ -309,7 +309,7 @@ class PowerTransformer(TransformerMixin, BaseEstimator):
         # get rid of them
         x = x[~np.isnan(x)]
         # choosing bracket -2, 2 like for boxcox
-        return optimize.brent(_neg_log_likelihood, brack=(-2, 2))
+        return optimize.brent(_neg_log_likelihood, brack=(-5, 5))
 
     def _check_input(self, X, in_fit, check_positive=False, check_shape=False,
                      check_method=False):

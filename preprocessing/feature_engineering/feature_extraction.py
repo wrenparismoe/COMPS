@@ -13,11 +13,12 @@ from timeit import default_timer as timer
 from tensorflow_addons.layers import WeightNormalization
 
 
-def principal_component_analysis(x: pd.DataFrame, dim: int=dimension) -> pd.DataFrame:
+def principal_component_analysis(x: pd.DataFrame, system: SystemComponents, dim: int=dimension) -> pd.DataFrame:
     if dim is None:
         dim = 16
-    pca = PCA(n_components=32, svd_solver='auto')
-    pca.fit(x)
+    pca = PCA(n_components=16, svd_solver='auto')
+    pca = pca.fit(x)
+    system.fitted_pca = pca
     extracted = pca.transform(x)
     x_extracted = pd.DataFrame(extracted, index=x.index)
 

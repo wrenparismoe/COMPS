@@ -1,63 +1,107 @@
-import plotly.graph_objects as plt
+from plotly import graph_objs as plt
 import matplotlib.dates as mdates
 from pandas.plotting import lag_plot
 from pandas.plotting import autocorrelation_plot
+import chart_studio
+import chart_studio.plotly as py
 from System import *
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets, sharing=True)
+chart_studio.tools.set_credentials_file(**studio_params)
+
+
+def plot_class_results(results: pd.DataFrame, model_name):
+    etf = results.name
+
+    #results = results.iloc[783:]
+
+    fig = plt.Figure()
+
+    fig.add_trace(plt.Scatter(x=results.index, y=results['y'], mode='lines',
+                              line=dict(color='grey', width=3), name='Target Price', ))
+
+
+    fig.add_trace(plt.Scatter(x=results.index, y=results['y_pred_false'], mode='markers',
+                             marker=dict(color='tomato', size=5.5), name='Incorrect Pred'))
+
+
+
+    fig.add_trace(plt.Scatter(x=results.index, y=results['y_pred_true'], mode='markers',
+                              marker=dict(color='forestgreen', size=5.5),
+                              name='Correct Pred'))
+
+    fig.update_layout(
+        title=etf + ' | Predicted vs True Closing Price (' + model_name + ')', xaxis_title='Date',
+        yaxis_title='Close Price $', font=dict(size=15)
+    )
+    fig.update_layout(legend_font_size=15)
+    fig.update_layout(legend_font_size=15)
+
+    if etf == etf_to_save:
+        if save_plot:
+            file_name = model_name + '_' + etf
+
+            py.plot(fig, filename=file_name, auto_open=show_plot)
+
+            return
+
+    if show_plot:
+        fig.show()
+
+
+
+
 
 def plot_results(results: pd.DataFrame, model_name):
     etf = results.name
 
+    # results = results.iloc[783:]
+
     fig = plt.Figure()
 
-    fig.add_trace(plt.Scatter(x=results.index, y=results['Close_Forecast'], mode='lines',
-                              line=dict(color='grey', width=3), name='Target Price',))
-
-    for i in range(forecast_out, results.shape[0]):
-        if not pd.isna(results['Test Target'].iloc[i]):
-            close_pred = results['Pred'].iloc[i]
+    for i in range(results.shape[0]):
+        if not pd.isna(results['y_test'].iloc[i]):
+            close_pred = results['y_pred'].iloc[i]
             index_pred = results.index[i]
-            close_last = results['Close_Forecast'].iloc[i-forecast_out]
-            index_last = results.index[i-forecast_out]
+            close_last = results['x'].iloc[i-1]
+            index_last = results.index[i-1]
 
             fig.add_trace(plt.Scatter(x=[index_last, index_pred], y=[close_last, close_pred], mode='lines',
-                                     line=dict(color='orange', width=3), showlegend=False))
+                                     line=dict(color='orange', width=2), showlegend=False))
 
-    fig.add_trace(plt.Scatter(x=results.index, y=results['pred_False'], mode='markers',
-                             marker=dict(color='tomato', size=5.5), name='Pred Incorrect'))
 
-    fig.add_trace(plt.Scatter(x=results.index, y=results['pred_True'], mode='markers',
+    fig.add_trace(plt.Scatter(x=results.index, y=results['x'], mode='lines',
+                              line=dict(color='grey', width=3), name='Target Price', ))
+
+    fig.add_trace(plt.Scatter(x=results.index, y=results['y_pred_false'], mode='markers',
+                             marker=dict(color='tomato', size=5.5), name='Incorrect Pred'))
+
+
+
+    fig.add_trace(plt.Scatter(x=results.index, y=results['y_pred_true'], mode='markers',
                               marker=dict(color='forestgreen', size=5.5),
-                              name='Pred Correct'))
+                              name='Correct Pred'))
+
+
 
     fig.update_layout(
-        title=results.name + ' | Predicted vs True Closing Price (' + model_name + ')',
-        xaxis_title='Date',
-        yaxis_title='Close Price $'
+        title=etf + ' | Predicted vs True Closing Price (' + model_name + ')', xaxis_title='Date',
+        yaxis_title='Close Price $', font=dict(size=15)
     )
+    fig.update_layout(legend_font_size=15)
+    fig.update_layout(legend_font_size=15)
 
     if etf == etf_to_save:
         if save_plot:
-            image_name = model_name + '_' + etf + '.html'
-            model_folder = model_name.split('_')[0]
+            file_name = model_name + '_' + etf
 
-            online_plot_path = r"C:\Users\wrenp\Documents\COMPS\results\plots\Online interactive plots\{}".format(model_folder)
-            offline_plot_path = r"C:\Users\wrenp\Documents\COMPS\results\plots\Offline png plots\{}".format(model_folder)
+            py.plot(fig, filename=file_name, auto_open=show_plot)
 
-            fig.write_html(online_plot_path + "\{}".format(image_name))
-            image_name = model_name + '_' + etf + '.png'
-            fig.write_image(offline_plot_path + "\{}".format(image_name), scale=100)
-
-
-    app.layout = html.Figure([dcc.Graph(figure=fig, id='forecast graph')])
+            return
 
     if show_plot:
-            app.run_server()
+        fig.show()
+
+
 
 def plotClose(data):
     months = mdates.MonthLocator()  # get every year
