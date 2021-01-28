@@ -6,15 +6,22 @@ from preprocessing.transform_data.transformer import PowerTransformer
 from statsmodels.tsa.stattools import adfuller
 from inputData.data import get_data
 
-def get_min(d: pd.DataFrame):
+def get_df_min(d: pd.DataFrame):
     des = d.describe()
     minimum = min(des.loc['min'])
     return minimum
 
-def get_max(d :pd.DataFrame):
+def get_df_max(d :pd.DataFrame):
     des = d.describe()
     maximum = max((des.loc['max']))
     return maximum
+
+def get_min(series: pd.Series) -> np.float32:
+    return series.min().astype(np.float32)
+
+def get_max(series: pd.Series) -> np.float32:
+    return series.max().astype(np.float32)
+
 
 
 def train_test_split(x: pd.DataFrame, y: pd.Series):

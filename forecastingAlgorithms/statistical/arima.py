@@ -118,9 +118,9 @@ if run == 'walk_forward1':
     print(errors)
     errors.to_clipboard(excel=True, index=False, header=False)
 
-lag_obs = 4
+lag_obs = 3
 diff = 1
-window = 5
+window = 4
 order = (lag_obs, diff, window)
 
 if run == 'custom':
@@ -163,7 +163,7 @@ if run == 'custom':
             pred_chg_list.append((pred - float(y.iloc[i-1])))
             y_test.append(float(y.iloc[i]))
             y_pred.append(pred)
-            print(d, ':', round(float(y.iloc[i]), 3), '--', round(pred,3))
+            # print(d, ':', round(float(y.iloc[i]), 3), '--', round(pred,3))
 
         y_pred = pd.Series(y_pred, index=test_index, name='pred')
         y_test = pd.Series(y_test, index=test_index, name='y_test')

@@ -12,9 +12,6 @@ from sklearn.model_selection import train_test_split
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, Matern, ConstantKernel, WhiteKernel, RationalQuadratic
-
-from scipy import stats
-
 system = SystemComponents()
 
 

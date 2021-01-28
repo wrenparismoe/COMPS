@@ -188,54 +188,41 @@ class LongSortTermMemory:
 
 
 
-if __name__ == '__main__':
-    if run == 'walk_forward':
 
-        #################################################################
+if run == 'custom':
 
-        system = SystemComponents(feature_space='OHLC', feature_engineering='', processor='MMS', distribution=None)
+    #################################################################
 
-        #################################################################
+    system = SystemComponents(feature_space='OHLC', feature_engineering='', processor='MMS', distribution=None)
 
-        model_name = 'LSTM'
-        model_name = get_model_name(model_name, system)
-        physical_devices = tf.config.list_physical_devices('GPU')
-        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    #################################################################
 
-        for t in market_etfs:
-            x, y, df = get_data(t, system)
+    model_name = 'LSTM'
+    model_name = get_model_name(model_name, system)
+    physical_devices = tf.config.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-            DG = DataGenerater(x, y)
+    for t in market_etfs:
+        x, y, df = get_data(t, system)
 
-            x = DG.process_training()
-            y = DG.y_seq
-            train_size = math.floor(x.shape[0] * 0.75)
+        DG = DataGenerater(x, y)
+        x = DG.process_training()
+        y = DG.y_seq
+        train_size = math.floor(x.shape[0] * 0.75)
+        train_start = df.index.get_loc('2018-02-26')
+
+        lstm = LongSortTermMemory()
+        lstm.create_model()
 
 
-            x_train = x[:train_size]
-            y_train = y[:train_size]
-            x_test = x[train_size:]
-            y_test = y[train_size:]
-
-            lstm = LongSortTermMemory()
-            lstm.create_model()
-            lstm.train_model()
-            lstm.evaluate_model()
-            y_pred = lstm.predict_model()
-
-            results = pd.DataFrame(y_test.flatten(), columns=['y_test'])
-            results['y_pred'] = y_pred.flatten()
-
-            print(results)
-
-            # for i in range(x_test.shape[0]):
-            #     x_train, x_test = DG.get_step(i)
-            #     print('train')
-            #     print(x_train)
-            #     print('test')
-            #     print(x_test)
-            #     exit()
-            #     #lstm.train_model()
+        for i in range(train_start, x_test.shape[0]):
+            x_train, x_test = DG.get_step(i)
+            print('train')
+            print(x_train)
+            print('test')
+            print(x_test)
+            exit()
+            #lstm.train_model()
 
 
 

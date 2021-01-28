@@ -9,7 +9,7 @@ import math
 
 studio_params = {'username': username, 'api_key': api_key}
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 #warnings.filterwarnings("ignore")
 

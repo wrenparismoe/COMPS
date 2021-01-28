@@ -1,25 +1,32 @@
 from System import *
 
 from inputData.data import get_data
-from preprocessing.process_data import get_model_name, preprocess, train_test_split
+from preprocessing.process_data import get_model_name, preprocess, difference, feature_difference, get_min, get_max
 from preprocessing.feature_engineering.feature_engineering_master import select_features
 from modules.evaluation import metrics_list, format_results
+from modules.evaluation import mean_absolute_percentage_error as mape
 from modules.plot import plot_results
+from modules.time_process import Timer
 
 from tensorflow.keras.layers import Input, Dense, LeakyReLU
-from tensorflow.keras.activations import relu, swish
+from tensorflow.keras.activations import relu, swish, linear
 from tensorflow.keras.models import Model
+from tensorflow.keras.losses import Reduction
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import Callback, EarlyStopping
-from tensorflow.keras.utils import plot_model
+from tensorflow.keras.utils import plot_model, normalize
 import tensorflow as tf
 from timeit import default_timer as timer
 from matplotlib import pyplot as plt
 from tensorflow.python.keras import backend as K
-import math
-import sys
+from tensorflow.keras.models import load_model
+from tensorflow.keras.backend import clear_session
+gpu = tf.config.list_physical_devices('GPU')[0]
 
-
+tf.config.experimental.set_memory_growth(gpu, True)
+tf.config.set_visible_devices(gpu, 'GPU')
+#tf.config.run_functions_eagerly(True)
+tf.keras.backend.set_floatx('float32')
 
 
 class TimingCallback(Callback):
@@ -31,9 +38,6 @@ class TimingCallback(Callback):
 
     def on_epoch_end(self, epoch, logs={}):
         self.logs.append(timer()-self.starttime)
-
-system = SystemComponents()
-
 
 def plot_accuracy(history, model_title):
     plt.plot(history.history['mean_absolute_percentage_error'])
@@ -49,70 +53,69 @@ def root_mean_squared_error(y_true, y_pred):
 
 def max_absolute(y_true, y_pred):
     return K.max(K.abs(y_true - y_pred), axis=0)
-
-
-
-tf.config.run_functions_eagerly(True)
-
-@tf.function
-def print(tensor):
-    tf.print(tensor, summarize=-1)
-
-@tf.autograph.experimental.do_not_convert
-def pred_loss(y_true, y_pred):
-
-    y_true_last = y_true[:-1,]
-    y_true = y_true[1:]
-    y_pred = y_pred[1:]
-
-    print(tf.concat([tf.concat([y_pred, y_true], axis=1), y_true_last], axis=1))
-
-    true_diff = tf.subtract(y_true, y_true_last)
-    pred_diff = tf.subtract(y_pred, y_true_last)
-
-    true_chg = tf.divide(true_diff, y_true_last)
-    pred_chg = tf.divide(pred_diff, y_true_last)
-
-    true_chg_sign = tf.sign(true_chg)
-    pred_chg_sign = tf.sign(pred_chg)
-
-    sign_tensor = tf.multiply(true_chg_sign, pred_chg_sign)
-    one_n = tf.constant(-1, dtype=tf.float32)
-
-    failed_pred_bools = tf.equal(sign_tensor, one_n)
-    failed_pred_ints = tf.cast(failed_pred_bools, dtype=tf.float32)
-
-    print(failed_pred_ints)
-
-    failed_preds = tf.math.multiply(failed_pred_ints, pred_chg)
-    failed_preds = tf.abs(failed_preds)
-    failed_preds = tf.multiply(failed_preds, tf.constant(100, dtype=tf.float32))
-
-    #####################################################################
-
-    failed_true = tf.multiply(failed_pred_ints, y_true)
-    failed_predictions = tf.multiply(failed_pred_ints, y_pred)
-
-    index_nonzero = tf.where(tf.not_equal(failed_true, tf.constant(0, dtype=tf.float32)), None, None)
-    index_nonzero = tf.squeeze(index_nonzero)
-
-    failed_true = tf.gather(failed_true, index_nonzero)
-    failed_predictions = tf.gather(failed_predictions, index_nonzero)
-
-    failed_mse = K.mean(tf.square(tf.subtract(failed_true, failed_predictions)))
-
-    diff = K.abs((y_true - y_pred) / K.clip(K.abs(y_true), K.epsilon(), None))
-    mape = 100. * K.mean(diff)
-
-    failed_diff = K.abs((failed_true - failed_predictions) / K.clip(K.abs(failed_true), K.epsilon(), None))
-    failed_mape = 100. * K.mean(failed_diff, axis=1)
-
-    exit()
-    return failed_mape
+# @tf.function
+# def print_tensor(tensor):
+#     tf.print(tensor, summarize=-1)
+#
+# @tf.autograph.experimental.do_not_convert
+# def pred_loss(y_true, y_pred):
+#
+#     y_true_last = y_true[:-1,]
+#     y_true = y_true[1:]
+#     y_pred = y_pred[1:]
+#
+#     print(tf.concat([tf.concat([y_pred, y_true], axis=1), y_true_last], axis=1))
+#
+#     true_diff = tf.subtract(y_true, y_true_last)
+#     pred_diff = tf.subtract(y_pred, y_true_last)
+#
+#     true_chg = tf.divide(true_diff, y_true_last)
+#     pred_chg = tf.divide(pred_diff, y_true_last)
+#
+#     true_chg_sign = tf.sign(true_chg)
+#     pred_chg_sign = tf.sign(pred_chg)
+#
+#     sign_tensor = tf.multiply(true_chg_sign, pred_chg_sign)
+#     one_n = tf.constant(-1, dtype=tf.float32)
+#
+#     failed_pred_bools = tf.equal(sign_tensor, one_n)
+#     failed_pred_ints = tf.cast(failed_pred_bools, dtype=tf.float32)
+#
+#     print(failed_pred_ints)
+#
+#     failed_preds = tf.math.multiply(failed_pred_ints, pred_chg)
+#     failed_preds = tf.abs(failed_preds)
+#     failed_preds = tf.multiply(failed_preds, tf.constant(100, dtype=tf.float32))
+#
+#     #####################################################################
+#
+#     failed_true = tf.multiply(failed_pred_ints, y_true)
+#     failed_predictions = tf.multiply(failed_pred_ints, y_pred)
+#
+#     index_nonzero = tf.where(tf.not_equal(failed_true, tf.constant(0, dtype=tf.float32)), None, None)
+#     index_nonzero = tf.squeeze(index_nonzero)
+#
+#     failed_true = tf.gather(failed_true, index_nonzero)
+#     failed_predictions = tf.gather(failed_predictions, index_nonzero)
+#
+#     failed_mse = K.mean(tf.square(tf.subtract(failed_true, failed_predictions)))
+#
+#     diff = K.abs((y_true - y_pred) / K.clip(K.abs(y_true), K.epsilon(), None))
+#     mape = 100. * K.mean(diff)
+#
+#     failed_diff = K.abs((failed_true - failed_predictions) / K.clip(K.abs(failed_true), K.epsilon(), None))
+#     failed_mape = 100. * K.mean(failed_diff, axis=1)
+#
+#     exit()
+#     return failed_mape
 
     # return K.math_ops.multiply(failed_mape, mape)
 
 
+
+# tf.config.run_functions_eagerly(True)
+
+@tf.function
 def directional_loss(y_true, y_pred):
     y_true_next = y_true[1:]
     y_pred_next = y_pred[1:]
@@ -142,11 +145,12 @@ def directional_loss(y_true, y_pred):
     # move one position later
     ones = tf.ones_like(indices)
     indices = tf.add(indices, ones)
-    indices = K.cast(indices, dtype='int32')
+    indices = tf.cast(indices, dtype='int32')
 
     # create a tensor to store directional loss and put it into custom loss output
-    direction_loss = tf.Variable(tf.ones_like(y_pred), dtype='float32')
-    updates = K.cast(tf.ones_like(indices), dtype='float32')
+    # direction_loss = tf.Variable(tf.ones_like(y_pred), dtype='float32')
+    direction_loss = tf.ones_like(y_pred, dtype=tf.float32)
+    updates = tf.cast(tf.ones_like(indices), dtype='float32')
     alpha = 1000
 
     # print(direction_loss)
@@ -155,271 +159,294 @@ def directional_loss(y_true, y_pred):
     # tf.print(indices.get_shape(), end='\n')
     # print(alpha * updates)
     #
-    # exit()
+    # exit()tf.multiply(tf.cast(alpha, dtype=tf.float32), updates)
 
-    direction_loss = tf.compat.v1.scatter_nd_update(direction_loss, indices, alpha*updates)
+    direction_loss = tf.tensor_scatter_nd_update(direction_loss, indices, alpha*updates)
 
-    return K.mean(tf.multiply(K.square(y_true - y_pred), direction_loss), axis=-1)
+    return tf.math.reduce_mean(tf.multiply(tf.square(y_true - y_pred), direction_loss), axis=-1)
 
-#####################################################
-
-epochs = 500
-
-batch_size = 32
+################################################################################################3
 
 #####################################################
+@tf.function
+def smape(y_true, y_pred):
+    y_true = tf.cast(y_true, dtype=tf.float32)
 
-class MLP:
+    num = tf.reduce_sum(tf.multiply(tf.constant(2, dtype=tf.float32), tf.abs(tf.subtract(y_true, y_pred))))
+    denom = tf.add(tf.abs(y_true), tf.abs(y_pred))
+    frac = tf.divide(num, denom)
+    coefficient = tf.divide(tf.constant(1, dtype=tf.float32), tf.cast(tf.size(y_true, out_type=tf.int32), dtype=tf.float32))
+    return tf.multiply(tf.multiply(coefficient, frac), tf.constant(100, dtype=tf.float32))
+
+
+class WindowGenerator():
+  def __init__(self, train, val, test, input_width, window=100):
+    # Store the raw data.
+    self.train = train
+    self.val = val
+    self.test = test
+
+    # Work out the label column indices.
+    self.label_columns = label_columns
+    if label_columns is not None:
+        self.label_columns_indices = {name: i for i, name in enumerate(label_columns)}
+    self.column_indices = {name: i for i, name in enumerate(train.shape[1])}
+
+    # Work out the window parameters.
+    self.input_width = input_width
+    self.window = window
+
+    self.total_window_size = input_width + window
+
+    self.input_slice = slice(0, input_width)
+    self.input_indices = np.arange(self.total_window_size)[self.input_slice]
+
+    self.label_start = self.total_window_size - 1
+    self.labels_slice = slice(self.label_start, None)
+    self.label_indices = np.arange(self.total_window_size)[self.labels_slice]
+
+  def __repr__(self):
+    return '\n'.join([
+        f'Total window size: {self.total_window_size}',
+        f'Input indices: {self.input_indices}',
+        f'Label indices: {self.label_indices}',
+        f'Label column name(s): {self.label_columns}'])
+
+
+def split_window(self, features):
+  inputs = features[:, self.input_slice, :]
+  labels = features[:, self.labels_slice, :]
+  if self.label_columns is not None:
+    labels = tf.stack(
+        [labels[:, :, self.column_indices[name]] for name in self.label_columns],
+        axis=-1)
+    # Slicing doesn't preserve static shape information, so set the shapes
+    # manually. This way the `tf.data.Datasets` are easier to inspect.
+    inputs.set_shape([None, self.input_width, None])
+    labels.set_shape([None, self.label_width, None])
+
+    return inputs, labels
+
+
+def MinMaxTensor(input: np.ndarray, current_range, feature_range = (0,1)) -> tf.Tensor:
+    x = tf.convert_to_tensor(input, dtype=tf.float32, name='input')
+    mins = tf.convert_to_tensor(current_range[0], dtype=tf.float32, name='mins')
+    maxs = tf.convert_to_tensor(current_range[1], dtype=tf.float32, name='maxs')
+    x_std = (x - mins) / (maxs - mins)
+    x_scaled = x_std * (feature_range[1] - feature_range[0]) + feature_range[0]
+    return x_scaled
+
+
+
+
+class MultilayeredPerceptron:
     def __init__(self):
         self.network_name = model_name + '-' + t
-        self.x_train = x_train
-        self.y_train = y_train
-        self.x_test = x_test
-        self.y_test = y_test
-        self.train_pred = None
-        self.test_pred = None
         self.model = None
-        self.modelTimer = None
-
-
+        self.y_pred = None
     def create_model(self):
-        dim = self.x_train.shape[1]
-
-        lrelu = lambda x: LeakyReLU(alpha=0.001)(x)
-
-        inputs = Input(shape=(dim, ), name='Input')
-        d1 = Dense(32, activation=swish, name='Dense_1')(inputs)
-        d2 = Dense(16, activation=swish, name='Dense_2')(d1)
-        outputs = Dense(1, activation=swish, name='Output')(d2)
-
+        dim = cols
+        # lrelu = lambda x: LeakyReLU(alpha=0.001)(x)
+        # inputs = Input(shape=(dim, ), name='Input')
+        # d1 = Dense(32, activation=swish, name='Dense_1')(inputs)
+        # d2 = Dense(16, activation=swish, name='Dense_2')(d1)
+        # outputs = Dense(1, name='Output')(d2)
+        #self.model = Model(inputs=inputs, outputs=outputs, name=self.network_name)
+        inputs = Input(shape=(dim,), name='Input')
+        d = Dense(dim//2, activation=relu)(inputs)
+        outputs = Dense(1, activation=linear)(d)
         self.model = Model(inputs=inputs, outputs=outputs, name=self.network_name)
-
-        # inputs = Input(shape=(dim,), name='Input')
-        # d = Dense(dim, activation=swish)(inputs)
-        # outputs = Dense(1)(d)
-
-    def plot_model(self):
+    def plot(self):
         plot_model(self.model, show_shapes=True)
 
-    def train_model(self):
-        global epochs
-        global batch_size
+    def train(self, lr=0.001, epochs=100, batch_size=1):
+        self.epochs = epochs
         self.modelTimer = TimingCallback()
-        stopper = EarlyStopping(monitor='mean_absolute_percentage_error', min_delta=0.0001, patience=20, mode='min',
-                                verbose=1, restore_best_weights=True)
+        self.stopper = EarlyStopping(monitor='loss', min_delta=0.01, baseline=None, patience=10, mode='min', verbose=0,
+                                      restore_best_weights=True)
+
+        self.model.compile(optimizer=Adam(lr), loss='mean_squared_error', metrics=['mean_absolute_percentage_error'])
 
 
-        self.model.compile(optimizer=Adam(0.01), loss=directional_loss, metrics=['mean_absolute_percentage_error'])
-        self.model.summary()
+        history = self.model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, callbacks=[self.stopper], verbose=0)
 
-        history = self.model.fit(self.x_train, self.y_train, epochs=epochs, batch_size=batch_size,
-                                callbacks=[self.modelTimer, marketTimer, stopper], validation_data=(self.x_test, self.y_test))
-
+        MLP.stopper.model.save('my_model.h5')
         self.epochs = len(history.history['mean_absolute_percentage_error'])
         #plot_accuracy(history, self.network_name)
 
-    def evaluate_model(self):
-        print()
-        print('Epochs:', self.epochs)
-        loss, acc = self.model.evaluate(self.x_test, self.y_test)
-        print(t, 'training time:', round(sum(self.modelTimer.logs), 4))
-        print(f'test_loss: {loss} --> test_acc: {acc}' + '\n')
+    def evaluate(self):
+        print('Epochs:', str(self.stopper.stopped_epoch) + '---' + str(self.stopper.best))
+        loss, acc = self.model.evaluate(x_test, y_test)
+        print(f'test_loss: {loss} --> test_mape: {acc}')
+    def predict(self):
+        pred = self.model.predict_step(x_test)
+        self.y_pred = np.float64(pred[0])
+        return self.y_pred
 
 
-    def predict_model(self):
-        train_pred = self.model.predict(x_train)
-        test_pred = self.model.predict(x_test)
-
-        predictions_2d = [train_pred, test_pred]
-        predictions_1d = []
-
-        for preds in predictions_2d:
-            preds_temp = np.full(len(preds), np.nan, dtype=np.float64)
-            i = 0
-            for p in preds:
-                preds_temp[i] = np.float64(p)
-                i += 1
-            predictions_1d.append(preds_temp)
-
-        train_pred = predictions_1d[0]
-        test_pred = predictions_1d[1]
-
-        self.train_pred = pd.Series(train_pred, index=self.x_train.index, name='pred')
-        self.test_pred = pd.Series(test_pred, index=self.x_test.index, name='pred')
 
 
-if __name__ == '__main__':
-    marketTimer = TimingCallback()
+#################################################################
+system = SystemComponents(feature_space='OHLCTAMV', feature_engineering='', processor='MMS')
+#################################################################
 
-    if run == 'custom':
-        #################################################################
-        system.feature_space = 'OHLCTAMV'
+model_name = 'MLP'
+model_name = get_model_name(model_name, system)
+marketTimer = TimingCallback()
+timer_list = []
+minMax_list = [[]]
+for t in market_etfs:
+    clear_session()
+    timer = Timer()
+    x, y, df = get_data(t, system)
+    x = pd.DataFrame.to_numpy(x).astype('float32')
+    y = pd.Series.to_numpy(y).astype('float32')
+    cols = x.shape[1]
 
-        system.feature_engineering = ''
+    MLP = MultilayeredPerceptron()
+    MLP.create_model()
 
-        system.processor = 'MMS'
+    y_pred, y_test, test_index, pred_chg_list = [], [], [], []
+    train_start = df.index.get_loc('2018-02-26')
 
-        system.distribution = None
-        #################################################################
+    training_window =100
 
-        model_name = 'MLP'
-        model_name = get_model_name(model_name, system)
-        physical_devices = tf.config.list_physical_devices('GPU')
-        #tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    for i in range(train_start, x.shape[0]):
+        if i == len(x[train_start:]) // 2:
+            print('50%%%%%%%%%%%%%%%')
+
+
+        x_train = x[i - training_window:i]
+        x_train = preprocess(x_train, system)
+        MAS = MaxAbsScaler()
+        MAS_fit = MAS.fit(x_train)
+        x_train = MAS.transform(x_train)
+        y_train = y[i - training_window:i]
+
+        x_test = x[i:i+1]
+        x_test = system.fitted_processor.transform(x_test)
+        x_test = MAS_fit.transform(x_test)
+
+        date = df.index[i]
+        ts = pd.to_datetime(str(date))
+        d = ts.strftime('%Y-%m-%d')
+        test_index.append(date)
+
+        # if not i == train_start:
+        #     model = load_model('my_model.h5', custom_objects={'loss': MLP.stopper.model.loss}, compile=False)
+
         cb = TimingCallback()
-        epochs_list = []
-        for t in market_etfs:
-            x, y,  df = get_data(t, system)
+        MLP.train()
+        pred = MLP.predict()
+        true = float(y[i])
 
-            x_transformed = preprocess(x, system)
+        y_test.append(true)
+        y_pred.append(pred)
+        pred_chg_list.append(pred -float(y[i-1]))
 
-            if system.feature_engineering != '':
-                x_transformed = select_features(x_transformed, y, system)
-
-            x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
-
-            y_train = pd.DataFrame.to_numpy(y_train)
-            y_test = pd.DataFrame.to_numpy(y_test)
-
-            multilayered_perceptron = MLP()
-            multilayered_perceptron.create_model()
-            multilayered_perceptron.train_model()
-            multilayered_perceptron.evaluate_model()
-            multilayered_perceptron.predict_model()
-
-            train_pred = multilayered_perceptron.train_pred
-            test_pred = multilayered_perceptron.test_pred
-
-            results = format_results(df, train_pred, test_pred, include_pred_errors)
-            forecast_metrics = metrics_list(results.loc[x_test.index.values], include_pred_errors)
-            errors.loc[t] = forecast_metrics
-            epochs_list.append(multilayered_perceptron.epochs)
-
-            if create_plot:
-                plot_results(results, model_name)
-
-        print('Total training time:', round(sum(marketTimer.logs), 4), 'seconds')
-        print('Epochs:', epochs_list)
-        print(model_name + '          features:', x_train.shape[1])
-        print(errors)
-        errors.to_clipboard(excel=True, index=False, header=False)
+        print(d, '| Best Loss:', round(MLP.stopper.best, 5), ': ', round(true, 3), '--', round(pred, 3))
 
 
 
-    if run == 'basic':
-        for data in system.input_list:
-            system.feature_space = data
-            for proc in system.processor_list:
-                system.processor = proc
-                model_name = 'MLP'
-                model_name = get_model_name(model_name, system)
-                physical_devices = tf.config.list_physical_devices('GPU')
-                tf.config.experimental.set_memory_growth(physical_devices[0], True)
-                cb = TimingCallback()
-                epochs = []
-                for t in market_etfs:
-                    x, df = get_data(t, system)
-                    features = x.columns
-                    label = 'Close_Next'
+    y_pred = pd.Series(y_pred, index=test_index, name='pred')
+    y_test = pd.Series(y_test, index=test_index, name='y_test')
+    results = format_results(df, y_test, y_pred)
+    pred_up = round((len([p for p in pred_chg_list if p > 0]) / len(pred_chg_list)) * 100, 2)
+    pred_up_str = str(pred_up) + '%'
+    forecast_metrics = metrics_list(results.loc[test_index])
+    forecast_metrics.append(pred_up_str)
+    print(forecast_metrics)
+    errors.loc[t] = forecast_metrics
+    timer_list.append(round(timer.end_timer(), 4))
 
-                    x_transformed = preprocess(x, system)
-                    y = pd.DataFrame.to_numpy(df['Close_Next'][:-1])
+    if create_plot:
+        plot_results(results, model_name)
 
-                    x_train, x_test, y_train, y_test = train_test_split(x_transformed, y, shuffle=True, train_size=0.75)
-
-                    multilayered_perceptron = MLP()
-                    multilayered_perceptron.create_model()
-                    multilayered_perceptron.train_model()
-
-                    multilayered_perceptron.evaluate_model()
-                    multilayered_perceptron.predict_model()
-
-                    train_pred = multilayered_perceptron.train_pred
-                    test_pred = multilayered_perceptron.test_pred
-
-                    results = format_results(df, train_pred, test_pred, include_pred_errors)
-
-                    forecast_metrics = metrics_list(results.loc[x_test.index.values], include_pred_errors)
-                    errors.loc[t] = forecast_metrics
-                    epochs.append(multilayered_perceptron.epochs)
-
-                    if create_plot and t == etf_to_save:
-                        plot_results(results, model_name)
-
-                print('Total training time:', round(sum(marketTimer.logs), 4), 'seconds')
-                print('Epochs:', epochs)
-                print(model_name + '          features:', x_train.shape[1])
-                print(errors)
-                errors.to_clipboard(excel=True, index=False, header=False)
-
-                print()
-                cont = input('continue? - type y:  ')
-                if cont == 'y':
-                    print()
-                    continue
-                else:
-                    exit()
-
-    if run == 'derived':
-        system.feature_space = 'OHLCTAMV'
-        for f_e in system.feature_engineering_list:
-            system.feature_engineering = f_e
-            for proc in system.processor_list:
-                system.processor = proc
-                model_name = 'MLP'
-                model_name = get_model_name(model_name, system)
-                physical_devices = tf.config.list_physical_devices('GPU')
-                tf.config.experimental.set_memory_growth(physical_devices[0], True)
-                cb = TimingCallback()
-                epochs = []
-                for t in market_etfs:
-                    x, y, df = get_data(t, system)
+print(model_name + '          features:', x.shape[1])
+print(errors)
+errors.to_clipboard(excel=True, index=False, header=False)
+print(timer_list)
 
 
-                    x_transformed = preprocess(x, system)
 
-                    x_transformed = select_features(x_transformed, y, system)
 
-                    x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
-                    y_train = pd.DataFrame.to_numpy(y_train)
-                    y_test = pd.DataFrame.to_numpy(y_test)
 
-                    multilayered_perceptron = MLP()
-                    multilayered_perceptron.create_model()
-                    multilayered_perceptron.train_model()
 
-                    multilayered_perceptron.evaluate_model()
-                    multilayered_perceptron.predict_model()
 
-                    train_pred = multilayered_perceptron.train_pred
-                    test_pred = multilayered_perceptron.test_pred
 
-                    results = format_results(df, train_pred, test_pred, include_pred_errors)
 
-                    forecast_metrics = metrics_list(results[train_index], include_pred_errors)
-                    errors.loc[t] = forecast_metrics
-                    epochs.append(multilayered_perceptron.epochs)
+"""
+model_name = 'MLP'
+model_name = get_model_name(model_name, system)
+marketTimer = TimingCallback()
+timer_list = []
+for t in market_etfs:
+    clear_session()
+    timer = Timer()
+    x, y, df = get_data(t, system)
+    x = pd.DataFrame.to_numpy(x).astype('float32')
+    y = pd.Series.to_numpy(y).astype('float32')
+    MLP = MultilayeredPerceptron()
+    MLP.create_model()
+    y_pred, y_test_list, test_index, pred_chg_list = [], [], [], []
+    train_start = df.index.get_loc('2019-02-26')
+    training_window =100
+    for i in range(train_start, x.shape[0]):
+        if i == len(x[train_start:]) // 2:
+            print('50%%%%%%%%%%%%%%%')
+        x_train, y_train = preprocess(x[i - training_window-3:i-3], system), y[i - training_window-3:i-3]
+        MAS = MaxAbsScaler()
+        MAS_fit = MAS.fit(x_train)
+        x_train = MAS.transform(x_train)
+        x_val, y_val = system.fitted_processor.transform(x[i-3:i]), y[i-3:i]
+        x_test, y_test = system.fitted_processor.transform(x[i:i+1]), y[i:i+1]
+        x_test = MAS_fit.transform(x_test)
 
-                    if create_plot:
-                        if t == etf_to_save:
-                            if save_plot:
-                                plot_results(results, model_name)
-                                break
-                        plot_results(results, model_name)
+        date = df.index[i]
+        ts = pd.to_datetime(str(date))
+        d = ts.strftime('%Y-%m-%d')
+        test_index.append(date)
+        if not i == train_start:
+            model = load_model('my_model.h5', custom_objects={'loss': MLP.stopper.model.loss}, compile=False)
 
-                print('Total training time:', round(sum(marketTimer.logs), 4), 'seconds')
-                print('Epochs:', epochs)
-                print(model_name + '          features:', x_train.shape[1])
-                print(errors)
-                errors.to_clipboard(excel=True, index=False, header=False)
+        cb = TimingCallback()
+        MLP.train()
+        pred = MLP.predict()
 
-                print()
-                cont = input('continue? - type y:  ')
-                if cont == 'y':
-                    print()
-                    continue
-                else:
-                    exit()
+        y_test_list.append(float(y[i]))
+        y_pred.append(pred)
+        pred_chg_list.append(pred -y[i-1])
+        print(d, '| Best Loss:', round(MLP.stopper.best, 5), ': ', round(float(y_test), 3), '--', round(pred, 3), '   MAPE:', round(mape(y_test, pred), 3), '%')
+
+
+
+    y_pred = pd.Series(y_pred, index=test_index, name='pred')
+    y_test = pd.Series(y_test_list, index=test_index, name='y_test')
+    results = format_results(df, y_test, y_pred)
+    pred_up = round((len([p for p in pred_chg_list if p > 0]) / len(pred_chg_list)) * 100, 2)
+    pred_up_str = str(pred_up) + '%'
+    forecast_metrics = metrics_list(results.loc[test_index])
+    forecast_metrics.append(pred_up_str)
+    print(forecast_metrics)
+    errors.loc[t] = forecast_metrics
+    timer_list.append(round(timer.end_timer(), 4))
+
+    if create_plot:
+        plot_results(results, model_name)
+
+print(model_name + '          features:', x.shape[1])
+print(errors)
+errors.to_clipboard(excel=True, index=False, header=False)
+print(timer_list)
+
+
+"""
+
+
+
+
+
+
 
 

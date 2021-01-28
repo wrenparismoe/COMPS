@@ -123,12 +123,16 @@ if run == 'custom':
     for t in market_etfs:
         print(t)
         x, y, df = get_data(t, system)
-        x_diff = feature_difference(x).dropna()
-        y_diff = difference(y).dropna()
+        # x_diff = feature_difference(x).dropna()
+        # y_diff = difference(y).dropna()
+
+        x_diff = x.copy()
+        y_diff = y.copy()
 
         train_start = x_diff.index.get_loc('2018-02-26')
-        # print('Samples to predict:', abs(train_start-len(x)))
-        training_window = 3
+        print('Samples to predict:', abs(train_start-len(x)))
+
+        training_window = 50
         x_p = preprocess(x_diff, system)
 
         y_pred, y_test, test_index, pred_chg_list = [], [], [], []
@@ -154,15 +158,24 @@ if run == 'custom':
 
             # x_test = MAS_fit.transform(x_test)
 
+            # model = LinearRegression(n_jobs=-1)
+            # model.fit(x_train, y_train)
+            # pred_chg = model.predict(x_test)
+            # pred_chg = float(pred_chg[0])
+            # pred = pred_chg + float(y.iloc[i - 1])
+            # pred_chg_list.append(pred_chg)
+            # y_pred.append(pred)
+            # y_test.append(float(y.iloc[i]))
+            # print(d, ':', round(y.iloc[i], 3), '--', round(pred,3), '    ', round(pred_chg, 2))
+
             model = LinearRegression(n_jobs=-1)
             model.fit(x_train, y_train)
-            pred_chg = model.predict(x_test)
-            pred_chg = float(pred_chg[0])
-            pred = pred_chg + float(y.iloc[i - 1])
+            pred = model.predict(x_test)
+            pred = float(pred[0])
+            pred_chg = pred - float(y.iloc[i - 1])
             pred_chg_list.append(pred_chg)
             y_pred.append(pred)
             y_test.append(float(y.iloc[i]))
-            # print(d, ':', round(y.iloc[i], 3), '--', round(pred,3), '    ', round(pred_chg, 2))
 
         y_pred = pd.Series(y_pred, index=test_index, name='pred')
         y_test = pd.Series(y_test, index=test_index, name='y_test')

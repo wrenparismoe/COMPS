@@ -6,9 +6,13 @@ from System import *
 def pearson(x: pd.DataFrame, y:  pd.Series, system: SystemComponents):
 
     cor_target = abs(x.corrwith(y, method="pearson"))
-    # cor_target = cor_target.sort_values()
 
-    threshold_features = cor_target[cor_target > 0.03]
+
+    # cor_target = cor_target.sort_values()
+    # print(cor_target)
+    # exit()
+
+    threshold_features = cor_target[cor_target > 0.05]
 
     # relevant_features = cor_target[len(cor_target)-dimension:]
     # selected_features = relevant_features.index.values

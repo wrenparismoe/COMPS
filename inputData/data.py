@@ -2,7 +2,7 @@ from System import *
 from pandas_datareader.data import DataReader as DR
 from technicalAnalysis.wrapper import add_all_ta_features
 from fredapi import Fred
-from statsmodels.datasets.macrodata import load_pandas as load_macro
+from time import sleep
 
 def get_min(d: pd.DataFrame):
     des = d.describe()
@@ -32,10 +32,10 @@ def get_close_df(ticker, new_data=False):
 def get_ohlc_df(ticker, new_data=False):
     startDate = '2012-1-01'
     #startDate = '2015-01-01'
-    if not new_data:
-        endDate = '2020-08-31'
-    else:
-        endDate = '2020-11-27'
+    # if not new_data:
+    #     endDate = '2020-08-31'
+    # else:
+    endDate = '2021-1-01'
 
     data = pd.DataFrame(DR(ticker, start=startDate, end=endDate, data_source='yahoo'))
 
@@ -56,45 +56,47 @@ def get_ta_df(data: pd.DataFrame):
     return indicator_df
 
 
-def get_mv_df(indices, new_data=False):
+def get_macro_df(indices, new_data=True):
     api_key = '9ab1f8cf73b430491cb394ccc8ef7af3'
     startDate = '2012-1-01'
     #startDate = '2015-01-01'
-    if not new_data:
-        endDate = '2020-08-31'
-    else:
-        endDate = '2020-11-27'
+    # if not new_data:
+    #     endDate = '2020-08-31'
+    # else:
+    endDate = '2021-1-01'
 
-    mv_df = pd.DataFrame(np.nan, columns=['FFR', 'DXY', 'CPI'], index=indices)
+    macro_df = pd.DataFrame(np.nan, columns=['FFR', 'DXY', 'CPI'], index=indices)
 
     fred = Fred(api_key=api_key)
-    mv_df['FFR'] = fred.get_series('FEDFUNDS', observation_start=startDate, observation_end=endDate)
-    mv_df['DXY'] = fred.get_series('DTWEXBGS', observation_start=startDate, observation_end=endDate)
-    mv_df['CPI'] = fred.get_series('CPIAUCSL', observation_start=startDate, observation_end=endDate)
+    macro_df['FFR'] = fred.get_series('FEDFUNDS', observation_start=startDate, observation_end=endDate)
+    macro_df['DXY'] = fred.get_series('DTWEXBGS', observation_start=startDate, observation_end=endDate)
+    macro_df['CPI'] = fred.get_series('CPIAUCSL', observation_start=startDate, observation_end=endDate)
 
-    mv_df['FFR'].iloc[0] = 0.12
-    mv_df['CPI'].iloc[0] = 236.222
+    macro_df['FFR'].iloc[0] = 0.12
+    macro_df['CPI'].iloc[0] = 236.222
 
     current_val = 0.12
-    for ind, val in mv_df['FFR'].iteritems():
+    for ind, val in macro_df['FFR'].iteritems():
         if val >= 0:
             current_val = val
         else:
-            mv_df['FFR'].loc[ind] = current_val
+            macro_df['FFR'].loc[ind] = current_val
 
-    for ind, val in mv_df['DXY'].iteritems():
+    print(macro_df['FFR']), exit()
+
+    for ind, val in macro_df['DXY'].iteritems():
         if pd.isnull(val):
-            loc = mv_df.index.get_loc(ind)
-            mv_df['DXY'].loc[ind] = mv_df['DXY'].iloc[loc-1]
+            loc = macro_df.index.get_loc(ind)
+            macro_df['DXY'].loc[ind] = macro_df['DXY'].iloc[loc-1]
 
     current_val = 236.222
-    for ind, val in mv_df['CPI'].iteritems():
+    for ind, val in macro_df['CPI'].iteritems():
         if val >= 0:
             current_val = val
         else:
-            mv_df['CPI'].loc[ind] = current_val
+            macro_df['CPI'].loc[ind] = current_val
 
-    return mv_df
+    return macro_df
 
 
 
@@ -103,13 +105,14 @@ def get_advanced_df(ticker, new_data=False):
     ind = data.index.values
 
     ta = get_ta_df(data)
-    mv = get_mv_df(ind, new_data)
+    mv = get_macro_df(ind, new_data)
 
     advanced_df = pd.merge(ta, mv, left_index=True, right_index=True)
 
     advanced_df.name = ticker
     return advanced_df
 
+get_advanced_df('V')
 
 def get_data(t, system: SystemComponents, new_data=False):
     df = None
@@ -210,15 +213,14 @@ def get_class_data(t, system: SystemComponents, new_data=False):
 
 def save_data_files():
     sys = SystemComponents()
-
+    sys.feature_space = 'OHLCTAMV'
     for t in market_etfs:
-        for f in sys.input_list:
-            sys.feature_space = f
+        x, y, data = get_data(t, sys)
 
-            x, y, data = get_data(t, sys)
+        data_name = r'C:\Users\wrenp\Documents\COMPS\dataFiles\{}'.format(t + '.csv')
+        data.to_csv(data_name, columns=data.columns)
 
-            data_name = r'dataFiles\{}'.format(t + '_' + f + '.csv')
-            data.to_csv(data_name)
+
 
 
 
