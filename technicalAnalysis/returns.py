@@ -5,11 +5,7 @@ from technicalAnalysis.utils import IndicatorMixin
 
 
 class DailyReturnIndicator(IndicatorMixin):
-    """Daily Return (DR)
-    Args:
-        close(pandas.Series): dataset 'Close' column.
-        fillna(bool): if True, fill nan values.
-    """
+
 
     def __init__(self, close: pd.Series, fillna: bool = False):
         self._close = close
@@ -21,22 +17,12 @@ class DailyReturnIndicator(IndicatorMixin):
         self._dr *= 100
 
     def daily_return(self) -> pd.Series:
-        """Daily Return (DR)
-        Returns:
-            pandas.Series: New feature generated.
-        """
+
         dr = self._check_fillna(self._dr, value=0)
         return pd.Series(dr, name='d_ret')
 
 
 class DailyLogReturnIndicator(IndicatorMixin):
-    """Daily Log Return (DLR)
-    https://stackoverflow.com/questions/31287552/logarithmic-returns-in-pandas-dataframe
-    Args:
-        close(pandas.Series): dataset 'Close' column.
-        fillna(bool): if True, fill nan values.
-    """
-
     def __init__(self, close: pd.Series, fillna: bool = False):
         self._close = close
         self._fillna = fillna
@@ -47,21 +33,12 @@ class DailyLogReturnIndicator(IndicatorMixin):
         self._dr *= 100
 
     def daily_log_return(self) -> pd.Series:
-        """Daily Log Return (DLR)
-        Returns:
-            pandas.Series: New feature generated.
-        """
+
         dr = self._check_fillna(self._dr, value=0)
         return pd.Series(dr, name='d_logret')
 
 
 class CumulativeReturnIndicator(IndicatorMixin):
-    """Cumulative Return (CR)
-    Args:
-        close(pandas.Series): dataset 'Close' column.
-        fillna(bool): if True, fill nan values.
-    """
-
     def __init__(self, close: pd.Series, fillna: bool = False):
         self._close = close
         self._fillna = fillna
@@ -72,43 +49,17 @@ class CumulativeReturnIndicator(IndicatorMixin):
         self._cr *= 100
 
     def cumulative_return(self) -> pd.Series:
-        """Cumulative Return (CR)
-        Returns:
-            pandas.Series: New feature generated.
-        """
         cr = self._check_fillna(self._cr, value=-1)
         return pd.Series(cr, name='cum_ret')
 
 
 def daily_return(close, fillna=False):
-    """Daily Return (DR)
-    Args:
-        close(pandas.Series): dataset 'Close' column.
-        fillna(bool): if True, fill nan values.
-    Returns:
-        pandas.Series: New feature generated.
-    """
     return DailyReturnIndicator(close=close, fillna=fillna).daily_return()
 
 
 def daily_log_return(close, fillna=False):
-    """Daily Log Return (DLR)
-    https://stackoverflow.com/questions/31287552/logarithmic-returns-in-pandas-dataframe
-    Args:
-        close(pandas.Series): dataset 'Close' column.
-        fillna(bool): if True, fill nan values.
-    Returns:
-        pandas.Series: New feature generated.
-    """
     return DailyLogReturnIndicator(close=close, fillna=fillna).daily_log_return()
 
 
 def cumulative_return(close, fillna=False):
-    """Cumulative Return (CR)
-    Args:
-        close(pandas.Series): dataset 'Close' column.
-        fillna(bool): if True, fill nan values.
-    Returns:
-        pandas.Series: New feature generated.
-    """
     return CumulativeReturnIndicator(close=close, fillna=fillna).cumulative_return()

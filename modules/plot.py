@@ -12,8 +12,6 @@ chart_studio.tools.set_credentials_file(**studio_params)
 def plot_class_results(results: pd.DataFrame, model_name):
     etf = results.name
 
-    #results = results.iloc[783:]
-
     fig = plt.Figure()
 
     fig.add_trace(plt.Scatter(x=results.index, y=results['y'], mode='lines',
@@ -54,7 +52,6 @@ def plot_class_results(results: pd.DataFrame, model_name):
 def plot_results(results: pd.DataFrame, model_name):
     etf = results.name
 
-    # results = results.iloc[783:]
 
     fig = plt.Figure()
 

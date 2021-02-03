@@ -21,9 +21,11 @@ import pickle
 tf.random.set_seed(11)
 np.random.seed(11)
 
+"""
+LSTM model for regression in TensorFlow under development
+"""
 
 system = SystemComponents()
-
 
 tf.config.run_functions_eagerly(True)
 
@@ -211,23 +213,12 @@ if run == 'custom':
         train_size = math.floor(x.shape[0] * 0.75)
         train_start = df.index.get_loc('2018-02-26')
 
-        lstm = LongSortTermMemory()
-        lstm.create_model()
+        long_short_term_memory = LongSortTermMemory()
+        long_short_term_memory.create_model()
 
 
         for i in range(train_start, x_test.shape[0]):
             x_train, x_test = DG.get_step(i)
-            print('train')
-            print(x_train)
-            print('test')
-            print(x_test)
-            exit()
-            #lstm.train_model()
-
-
-
-"""
-            
 
             if system.feature_engineering != '':
                 x_transformed = select_features(x_transformed, y, system)
@@ -235,12 +226,9 @@ if run == 'custom':
             x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
 
-
-            long_short_term_memory = LongSortTermMemory()
-            long_short_term_memory.create_model()
             long_short_term_memory.train_model()
 
-            #long_short_term_memory.evaluate_model()
+            long_short_term_memory.evaluate_model()
             long_short_term_memory.predict_model()
 
             train_pred = long_short_term_memory.train_pred
@@ -320,4 +308,3 @@ if run == 'custom':
                 else:
                     exit()
                     
-"""

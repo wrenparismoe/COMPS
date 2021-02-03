@@ -14,9 +14,6 @@ def format_results(df, y_test: pd.Series, y_pred: pd.Series):
     results['y_pred'] = y_pred
     results['y_test'] = y_test
 
-    # if y_pred.iloc[0] == 0 or y_pred.iloc[0] == 1:
-    #     results = get_class_pred_validations(results)
-    # else:
     results = get_pred_validations(results)
     results.name = df.name
 
@@ -97,10 +94,6 @@ def get_pred_pct(pred):
 def metrics_list(test_results: pd.DataFrame):
     y_test = test_results['y_test']
     y_pred = test_results['y_pred']
-
-
-    # forecast_metrics = [metrics.mean_squared_error(y_test, y_pred), mean_absolute_percentage_error(y_test, y_pred),
-    #                     smape(y_test, y_pred), metrics.r2_score(y_test, y_pred) ]
 
     forecast_metrics = [metrics.max_error(y_test, y_pred), metrics.mean_absolute_error(y_test, y_pred),
                         mean_absolute_percentage_error(y_test, y_pred),

@@ -36,7 +36,7 @@ if run == 'basic':
 
                 results = format_results(df, y_test, y_pred)
 
-                forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+                forecast_metrics = metrics_list(results.loc[test_index])
                 errors.loc[t] = forecast_metrics
 
                 if create_plot and t == 'QQQ':
@@ -195,18 +195,18 @@ if run == 'walk_forward':
             y_pred.append(pred)
             print(d, ':', round(y.iat[i], 4), '--', round(pred, 4))
 
-
-        y_pred = pd.Series(y_pred, index=x.index[train_start:], name='pred')
+        y_pred = pd.Series(y_pred, index=test_index, name='pred')
+        y_test = pd.Series(y_test, index=test_index, name='y_test')
 
         results = format_results(df, y_test, y_pred)
 
-        forecast_metrics = metrics_list(results.iloc[train_start:])
+        forecast_metrics = metrics_list(results.loc[test_index])
+
         print(forecast_metrics)
         errors.loc[t] = forecast_metrics
 
         if create_plot:
             plot_results(results, model_name)
-            exit()
 
     print(model_name + '          features:', x_train.shape[1])
     print(errors)

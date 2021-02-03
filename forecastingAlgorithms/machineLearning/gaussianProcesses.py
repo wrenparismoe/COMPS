@@ -11,7 +11,7 @@ from modules.time_process import Timer
 from sklearn.model_selection import train_test_split
 
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, Matern, ConstantKernel, WhiteKernel, RationalQuadratic
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel
 system = SystemComponents()
 
 
@@ -32,7 +32,8 @@ if run == 'basic':
 
                 x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
-                model = GaussianProcessRegressor(kernel=Matern() + RBF(), alpha=0.001)
+                kernel = RBF() + WhiteKernel(1)
+                model = GaussianProcessRegressor(kernel=kernel, normalize_y=True)
                 model.fit(x_train, y_train)
 
                 y_pred = model.predict(x_test)
@@ -75,7 +76,8 @@ if run == 'derived':
 
                 x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
-                model = GaussianProcessRegressor(kernel=Matern() + RBF(), alpha=0.01)
+                kernel = RBF() + WhiteKernel(1)
+                model = GaussianProcessRegressor(kernel=kernel, normalize_y=True)
                 model.fit(x_train, y_train)
 
                 train_pred = model.predict(x_train)
@@ -135,7 +137,8 @@ if run == 'custom':
         x_train = preprocess(x_train, system)
         x_test = system.fitted_processor.transform(x_test)
 
-        model = GaussianProcessRegressor(kernel=Matern() + RBF(), alpha=0.001, normalize_y=True)
+        kernel = RBF() + WhiteKernel(1)
+        model = GaussianProcessRegressor(kernel=kernel, normalize_y=True)
         model.fit(x_train, y_train)
 
 

@@ -28,6 +28,10 @@ from sklearn.utils.validation import (check_is_fitted, check_random_state,
 
 BOUNDS_THRESHOLD = 1e-7
 
+"""
+Edit of sklearn yeo-johnson transformation
+"""
+
 
 class PowerTransformer(TransformerMixin, BaseEstimator):
     """Apply a power transform featurewise to make data more Gaussian-like.

@@ -1,6 +1,7 @@
 from sklearn.decomposition import KernelPCA, PCA
 from sklearn.model_selection import train_test_split
 from System import *
+"""
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.layers import Input, Dense, LeakyReLU, BatchNormalization, Dropout
@@ -10,8 +11,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import Callback, EarlyStopping
 from tensorflow.keras.utils import plot_model
 from timeit import default_timer as timer
-from tensorflow_addons.layers import WeightNormalization
-
+"""
 
 def principal_component_analysis(x: pd.DataFrame, system: SystemComponents, dim: int=dimension) -> pd.DataFrame:
     if dim is None:
@@ -24,6 +24,8 @@ def principal_component_analysis(x: pd.DataFrame, system: SystemComponents, dim:
 
     return x_extracted
 
+
+"""
 class TimingCallback(Callback):
     def __init__(self, logs={}):
         self.logs = []
@@ -114,5 +116,5 @@ def stacked_auto_encoders(x):
 
 
 cb = TimingCallback()
-
+"""
 

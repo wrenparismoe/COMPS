@@ -1,5 +1,10 @@
 import pandas as pd
 
+"""
+Technical analysis indicator methods based off Darío López Padial's implementation @https://github.com/bukosabino/ta
+
+"""
+
 from technicalAnalysis.momentum import (AwesomeOscillatorIndicator, KAMAIndicator,
                          ROCIndicator, RSIIndicator, StochasticOscillator,
                          TSIIndicator, UltimateOscillator, WilliamsRIndicator)
@@ -20,19 +25,6 @@ from technicalAnalysis.volume import (AccDistIndexIndicator, ChaikinMoneyFlowInd
 
 def add_volume_ta(df: pd.DataFrame, high: str, low: str, close: str, volume: str,
                   fillna: bool = False, colprefix: str = "") -> pd.DataFrame:
-    """Add volume technical analysis features to dataframe.
-    Args:
-        df (pandas.core.frame.DataFrame): Dataframe base.
-        high (str): Name of 'high' column.
-        low (str): Name of 'low' column.
-        close (str): Name of 'close' column.
-        volume (str): Name of 'volume' column.
-        fillna(bool): if True, fill nan values.
-        colprefix(str): Prefix column names inserted
-    Returns:
-        pandas.core.frame.DataFrame: Dataframe with new features.
-    """
-
     # Accumulation Distribution Index
     df[f'{colprefix}volume_adi'] = AccDistIndexIndicator(
         high=df[high], low=df[low], close=df[close], volume=df[volume], fillna=fillna).acc_dist_index()
@@ -76,18 +68,6 @@ def add_volume_ta(df: pd.DataFrame, high: str, low: str, close: str, volume: str
 
 def add_volatility_ta(df: pd.DataFrame, high: str, low: str, close: str,
                       fillna: bool = False, colprefix: str = "") -> pd.DataFrame:
-    """Add volatility technical analysis features to dataframe.
-    Args:
-        df (pandas.core.frame.DataFrame): Dataframe base.
-        high (str): Name of 'high' column.
-        low (str): Name of 'low' column.
-        close (str): Name of 'close' column.
-        fillna(bool): if True, fill nan values.
-        colprefix(str): Prefix column names inserted
-    Returns:
-        pandas.core.frame.DataFrame: Dataframe with new features.
-    """
-
     # Average True Range
     df[f'{colprefix}volatility_atr'] = AverageTrueRange(
         close=df[close], high=df[high], low=df[low], n=10, fillna=fillna).average_true_range()
@@ -125,18 +105,6 @@ def add_volatility_ta(df: pd.DataFrame, high: str, low: str, close: str,
 
 def add_trend_ta(df: pd.DataFrame, high: str, low: str, close: str, fillna: bool = False,
                  colprefix: str = "") -> pd.DataFrame:
-    """Add trend technical analysis features to dataframe.
-    Args:
-        df (pandas.core.frame.DataFrame): Dataframe base.
-        high (str): Name of 'high' column.
-        low (str): Name of 'low' column.
-        close (str): Name of 'close' column.
-        fillna(bool): if True, fill nan values.
-        colprefix(str): Prefix column names inserted
-    Returns:
-        pandas.core.frame.DataFrame: Dataframe with new features.
-    """
-
     # MACD
     indicator_macd = MACD(close=df[close], n_slow=26, n_fast=12, n_sign=9, fillna=fillna)
     df[f'{colprefix}trend_macd'] = indicator_macd.macd()
@@ -221,18 +189,6 @@ def add_trend_ta(df: pd.DataFrame, high: str, low: str, close: str, fillna: bool
 
 def add_momentum_ta(df: pd.DataFrame, high: str, low: str, close: str, volume: str,
                     fillna: bool = False, colprefix: str = "") -> pd.DataFrame:
-    """Add trend technical analysis features to dataframe.
-    Args:
-        df (pandas.core.frame.DataFrame): Dataframe base.
-        high (str): Name of 'high' column.
-        low (str): Name of 'low' column.
-        close (str): Name of 'close' column.
-        fillna(bool): if True, fill nan values.
-        colprefix(str): Prefix column names inserted
-    Returns:
-        pandas.core.frame.DataFrame: Dataframe with new features.
-    """
-
     # Relative Strength Index (RSI)
     df[f'{colprefix}momentum_rsi'] = RSIIndicator(close=df[close], n=14, fillna=fillna).rsi()
 
@@ -267,15 +223,6 @@ def add_momentum_ta(df: pd.DataFrame, high: str, low: str, close: str, volume: s
 
 
 def add_others_ta(df: pd.DataFrame, close: str, fillna: bool = False, colprefix: str = "") -> pd.DataFrame:
-    """Add others analysis features to dataframe.
-    Args:
-        df (pandas.core.frame.DataFrame): Dataframe base.
-        close (str): Name of 'close' column.
-        fillna(bool): if True, fill nan values.
-        colprefix(str): Prefix column names inserted
-    Returns:
-        pandas.core.frame.DataFrame: Dataframe with new features.
-    """
     # Daily Return
     df[f'{colprefix}others_dr'] = DailyReturnIndicator(close=df[close], fillna=fillna).daily_return()
 
@@ -291,19 +238,6 @@ def add_others_ta(df: pd.DataFrame, close: str, fillna: bool = False, colprefix:
 
 def add_all_ta_features(df: pd.DataFrame, open: str, high: str, low: str,
                         close: str, volume: str, fillna: bool = False, colprefix: str = "") -> pd.DataFrame:
-    """Add all technical analysis features to dataframe.
-    Args:
-        df (pandas.core.frame.DataFrame): Dataframe base.
-        open (str): Name of 'open' column.
-        high (str): Name of 'high' column.
-        low (str): Name of 'low' column.
-        close (str): Name of 'close' column.
-        volume (str): Name of 'volume' column.
-        fillna(bool): if True, fill nan values.
-        colprefix(str): Prefix column names inserted
-    Returns:
-        pandas.core.frame.DataFrame: Dataframe with new features.
-    """
     df = add_volume_ta(df=df, high=high, low=low, close=close, volume=volume, fillna=fillna, colprefix=colprefix)
     df = add_volatility_ta(df=df, high=high, low=low, close=close, fillna=fillna, colprefix=colprefix)
     df = add_trend_ta(df=df, high=high, low=low, close=close, fillna=fillna, colprefix=colprefix)

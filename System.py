@@ -7,10 +7,14 @@ from sklearn.preprocessing import MinMaxScaler, MaxAbsScaler, StandardScaler
 from preprocessing.transform_data.transformer import PowerTransformer
 import math
 
+"""
+MASTER CONTROLLER FILE AND CLASS
+alter to change which model combination to run and how
+"""
+
 studio_params = {'username': username, 'api_key': api_key}
 
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-
 #warnings.filterwarnings("ignore")
 
 np.set_printoptions(edgeitems=100, linewidth=1000)
@@ -92,7 +96,7 @@ dimension = 32
 
 include_pred_errors = True
 
-create_plot = True
+create_plot = False
 show_plot = True
 save_plot = False
 etf_to_save = market_etfs[0]
@@ -102,8 +106,6 @@ etf_to_save = market_etfs[0]
 
 
 if include_pred_errors:
-    # errors = pd.DataFrame(np.zeros((len(market_etfs), 5)), columns=["MSE", "MAPE", "sMAPE", "r2", "Prediction %"],
-    #                       index=market_etfs)
     errors = pd.DataFrame(np.zeros((len(market_etfs), 6)), columns=["ME", "MAE", "MAPE", "RMSE", "Prediction %", 'Pred Incr %'],
                           index=market_etfs)
 else:

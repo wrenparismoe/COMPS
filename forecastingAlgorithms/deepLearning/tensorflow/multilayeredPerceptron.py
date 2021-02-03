@@ -23,6 +23,11 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.backend import clear_session
 gpu = tf.config.list_physical_devices('GPU')[0]
 
+"""
+MLP model for regression in TensorFlow/Keras under development
+"""
+
+
 tf.config.experimental.set_memory_growth(gpu, True)
 tf.config.set_visible_devices(gpu, 'GPU')
 #tf.config.run_functions_eagerly(True)
@@ -53,67 +58,11 @@ def root_mean_squared_error(y_true, y_pred):
 
 def max_absolute(y_true, y_pred):
     return K.max(K.abs(y_true - y_pred), axis=0)
-# @tf.function
-# def print_tensor(tensor):
-#     tf.print(tensor, summarize=-1)
-#
-# @tf.autograph.experimental.do_not_convert
-# def pred_loss(y_true, y_pred):
-#
-#     y_true_last = y_true[:-1,]
-#     y_true = y_true[1:]
-#     y_pred = y_pred[1:]
-#
-#     print(tf.concat([tf.concat([y_pred, y_true], axis=1), y_true_last], axis=1))
-#
-#     true_diff = tf.subtract(y_true, y_true_last)
-#     pred_diff = tf.subtract(y_pred, y_true_last)
-#
-#     true_chg = tf.divide(true_diff, y_true_last)
-#     pred_chg = tf.divide(pred_diff, y_true_last)
-#
-#     true_chg_sign = tf.sign(true_chg)
-#     pred_chg_sign = tf.sign(pred_chg)
-#
-#     sign_tensor = tf.multiply(true_chg_sign, pred_chg_sign)
-#     one_n = tf.constant(-1, dtype=tf.float32)
-#
-#     failed_pred_bools = tf.equal(sign_tensor, one_n)
-#     failed_pred_ints = tf.cast(failed_pred_bools, dtype=tf.float32)
-#
-#     print(failed_pred_ints)
-#
-#     failed_preds = tf.math.multiply(failed_pred_ints, pred_chg)
-#     failed_preds = tf.abs(failed_preds)
-#     failed_preds = tf.multiply(failed_preds, tf.constant(100, dtype=tf.float32))
-#
-#     #####################################################################
-#
-#     failed_true = tf.multiply(failed_pred_ints, y_true)
-#     failed_predictions = tf.multiply(failed_pred_ints, y_pred)
-#
-#     index_nonzero = tf.where(tf.not_equal(failed_true, tf.constant(0, dtype=tf.float32)), None, None)
-#     index_nonzero = tf.squeeze(index_nonzero)
-#
-#     failed_true = tf.gather(failed_true, index_nonzero)
-#     failed_predictions = tf.gather(failed_predictions, index_nonzero)
-#
-#     failed_mse = K.mean(tf.square(tf.subtract(failed_true, failed_predictions)))
-#
-#     diff = K.abs((y_true - y_pred) / K.clip(K.abs(y_true), K.epsilon(), None))
-#     mape = 100. * K.mean(diff)
-#
-#     failed_diff = K.abs((failed_true - failed_predictions) / K.clip(K.abs(failed_true), K.epsilon(), None))
-#     failed_mape = 100. * K.mean(failed_diff, axis=1)
-#
-#     exit()
-#     return failed_mape
-
-    # return K.math_ops.multiply(failed_mape, mape)
 
 
-
-# tf.config.run_functions_eagerly(True)
+@tf.function
+def print_tensor(tensor):
+    tf.print(tensor, summarize=-1)
 
 @tf.function
 def directional_loss(y_true, y_pred):
@@ -123,9 +72,7 @@ def directional_loss(y_true, y_pred):
     y_true_tdy = y_true[:-1]
     y_pred_tdy = y_pred[:-1]
 
-    # tf.print('Shape of y_pred_back -', y_pred_tdy.get_shape())
-
-    # substract to get up/down movement of the two tensors
+    # subtract to get up/down movement of the two tensors
     y_true_diff = tf.subtract(y_true_next, y_true_tdy)
     y_pred_diff = tf.subtract(y_pred_next, y_pred_tdy)
 
@@ -148,26 +95,17 @@ def directional_loss(y_true, y_pred):
     indices = tf.cast(indices, dtype='int32')
 
     # create a tensor to store directional loss and put it into custom loss output
-    # direction_loss = tf.Variable(tf.ones_like(y_pred), dtype='float32')
     direction_loss = tf.ones_like(y_pred, dtype=tf.float32)
     updates = tf.cast(tf.ones_like(indices), dtype='float32')
     alpha = 1000
 
-    # print(direction_loss)
-    # tf.print(direction_loss.get_shape(), end='\n')
-    # print(indices)
-    # tf.print(indices.get_shape(), end='\n')
-    # print(alpha * updates)
-    #
-    # exit()tf.multiply(tf.cast(alpha, dtype=tf.float32), updates)
+    tf.multiply(tf.cast(alpha, dtype=tf.float32), updates)
 
     direction_loss = tf.tensor_scatter_nd_update(direction_loss, indices, alpha*updates)
 
     return tf.math.reduce_mean(tf.multiply(tf.square(y_true - y_pred), direction_loss), axis=-1)
 
-################################################################################################3
 
-#####################################################
 @tf.function
 def smape(y_true, y_pred):
     y_true = tf.cast(y_true, dtype=tf.float32)
@@ -180,63 +118,46 @@ def smape(y_true, y_pred):
 
 
 class WindowGenerator():
-  def __init__(self, train, val, test, input_width, window=100):
-    # Store the raw data.
-    self.train = train
-    self.val = val
-    self.test = test
+    def __init__(self, train, val, test, input_width, window=100):
+        # Store the raw data.
+        self.train = train
+        self.val = val
+        self.test = test
 
-    # Work out the label column indices.
-    self.label_columns = label_columns
-    if label_columns is not None:
-        self.label_columns_indices = {name: i for i, name in enumerate(label_columns)}
-    self.column_indices = {name: i for i, name in enumerate(train.shape[1])}
+        # Work out the label column indices.
+        self.column_indices = {name: i for i, name in enumerate(train.shape[1])}
 
-    # Work out the window parameters.
-    self.input_width = input_width
-    self.window = window
+        # Work out the window parameters.
+        self.input_width = input_width
+        self.window = window
 
-    self.total_window_size = input_width + window
+        self.total_window_size = input_width + window
 
-    self.input_slice = slice(0, input_width)
-    self.input_indices = np.arange(self.total_window_size)[self.input_slice]
+        self.input_slice = slice(0, input_width)
+        self.input_indices = np.arange(self.total_window_size)[self.input_slice]
 
-    self.label_start = self.total_window_size - 1
-    self.labels_slice = slice(self.label_start, None)
-    self.label_indices = np.arange(self.total_window_size)[self.labels_slice]
+        self.label_start = self.total_window_size - 1
+        self.labels_slice = slice(self.label_start, None)
+        self.label_indices = np.arange(self.total_window_size)[self.labels_slice]
 
-  def __repr__(self):
-    return '\n'.join([
-        f'Total window size: {self.total_window_size}',
-        f'Input indices: {self.input_indices}',
-        f'Label indices: {self.label_indices}',
-        f'Label column name(s): {self.label_columns}'])
+    def __repr__(self):
+        return '\n'.join([
+            f'Total window size: {self.total_window_size}',
+            f'Input indices: {self.input_indices}',
+            f'Label indices: {self.label_indices}'])
 
 
 def split_window(self, features):
-  inputs = features[:, self.input_slice, :]
-  labels = features[:, self.labels_slice, :]
-  if self.label_columns is not None:
-    labels = tf.stack(
-        [labels[:, :, self.column_indices[name]] for name in self.label_columns],
-        axis=-1)
-    # Slicing doesn't preserve static shape information, so set the shapes
-    # manually. This way the `tf.data.Datasets` are easier to inspect.
+    inputs = features[:, self.input_slice, :]
+    labels = features[:, self.labels_slice, :]
+    if self.label_columns is not None:
+        labels = tf.stack(
+            [labels[:, :, self.column_indices[name]] for name in self.label_columns],
+            axis=-1)
     inputs.set_shape([None, self.input_width, None])
     labels.set_shape([None, self.label_width, None])
 
     return inputs, labels
-
-
-def MinMaxTensor(input: np.ndarray, current_range, feature_range = (0,1)) -> tf.Tensor:
-    x = tf.convert_to_tensor(input, dtype=tf.float32, name='input')
-    mins = tf.convert_to_tensor(current_range[0], dtype=tf.float32, name='mins')
-    maxs = tf.convert_to_tensor(current_range[1], dtype=tf.float32, name='maxs')
-    x_std = (x - mins) / (maxs - mins)
-    x_scaled = x_std * (feature_range[1] - feature_range[0]) + feature_range[0]
-    return x_scaled
-
-
 
 
 class MultilayeredPerceptron:
@@ -246,16 +167,13 @@ class MultilayeredPerceptron:
         self.y_pred = None
     def create_model(self):
         dim = cols
-        # lrelu = lambda x: LeakyReLU(alpha=0.001)(x)
-        # inputs = Input(shape=(dim, ), name='Input')
-        # d1 = Dense(32, activation=swish, name='Dense_1')(inputs)
-        # d2 = Dense(16, activation=swish, name='Dense_2')(d1)
-        # outputs = Dense(1, name='Output')(d2)
-        #self.model = Model(inputs=inputs, outputs=outputs, name=self.network_name)
-        inputs = Input(shape=(dim,), name='Input')
-        d = Dense(dim//2, activation=relu)(inputs)
-        outputs = Dense(1, activation=linear)(d)
+        lrelu = lambda x: LeakyReLU(alpha=0.001)(x)
+        inputs = Input(shape=(dim, ), name='Input')
+        d1 = Dense(32, activation=swish, name='Dense_1')(inputs)
+        d2 = Dense(16, activation=swish, name='Dense_2')(d1)
+        outputs = Dense(1, name='Output')(d2)
         self.model = Model(inputs=inputs, outputs=outputs, name=self.network_name)
+
     def plot(self):
         plot_model(self.model, show_shapes=True)
 

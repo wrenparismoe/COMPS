@@ -82,7 +82,6 @@ def get_macro_df(indices, new_data=True):
         else:
             macro_df['FFR'].loc[ind] = current_val
 
-    print(macro_df['FFR']), exit()
 
     for ind, val in macro_df['DXY'].iteritems():
         if pd.isnull(val):
@@ -112,7 +111,7 @@ def get_advanced_df(ticker, new_data=False):
     advanced_df.name = ticker
     return advanced_df
 
-get_advanced_df('V')
+
 
 def get_data(t, system: SystemComponents, new_data=False):
     df = None

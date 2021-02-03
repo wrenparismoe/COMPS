@@ -1,7 +1,7 @@
 from System import *
 
 from inputData.data import get_data
-from preprocessing.process_data import get_model_name, preprocess, difference, invert_difference, feature_difference
+from preprocessing.process_data import get_model_name, preprocess, difference, invert_difference, feature_difference, train_test_split
 from preprocessing.feature_engineering.feature_engineering_master import select_features
 from modules.evaluation import metrics_list, format_results
 from modules.plot import plot_results
@@ -26,7 +26,8 @@ if run == 'basic':
 
                 x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
-                model = DecisionTreeRegressor(criterion='mse')
+                DT = DecisionTreeRegressor(criterion='friedman_mse', max_depth=3, min_samples_split=2)
+                model = AdaBoostRegressor(base_estimator=DT, n_estimators=50, learning_rate=0.75, loss='linear')
 
                 model.fit(x_train, y_train)
 
@@ -35,9 +36,9 @@ if run == 'basic':
                 test_pred = model.predict(x_test)
                 test_pred = pd.Series(test_pred, index=x_test.index, name='pred')
 
-                results = format_results(df, train_pred, test_pred, include_pred_errors)
+                results = format_results(df, train_pred, test_pred)
 
-                forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+                forecast_metrics = metrics_list(results.loc[test_index])
                 errors.loc[t] = forecast_metrics
 
                 if create_plot and t == 'QQQ':
@@ -72,7 +73,8 @@ if run == 'derived':
 
                 x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
-                model = DecisionTreeRegressor(criterion='mse')
+                DT = DecisionTreeRegressor(criterion='friedman_mse', max_depth=3, min_samples_split=2)
+                model = AdaBoostRegressor(base_estimator=DT, n_estimators=50, learning_rate=0.75, loss='linear')
                 model.fit(x_train, y_train)
 
                 train_pred = model.predict(x_train)
@@ -80,9 +82,9 @@ if run == 'derived':
                 test_pred = model.predict(x_test)
                 test_pred = pd.Series(test_pred, index=x_test.index, name='pred')
 
-                results = format_results(df, train_pred, test_pred, include_pred_errors)
+                results = format_results(df, train_pred, test_pred)
 
-                forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+                forecast_metrics = metrics_list(results.loc[test_index])
                 errors.loc[t] = forecast_metrics
 
                 if create_plot and t == 'QQQ':
@@ -120,7 +122,8 @@ if run == 'custom':
 
         x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
-        model = DecisionTreeRegressor(criterion='mse')
+        DT = DecisionTreeRegressor(criterion='friedman_mse', max_depth=3, min_samples_split=2)
+        model = AdaBoostRegressor(base_estimator=DT, n_estimators=50, learning_rate=0.75, loss='linear')
         model.fit(x_train, y_train)
 
         y_pred = model.predict(x_test)

@@ -1,15 +1,11 @@
 from System import *
-
 from inputData.data import get_data
 from preprocessing.process_data import get_model_name, preprocess, train_test_split
 from preprocessing.feature_engineering.feature_engineering_master import select_features
 from modules.evaluation import metrics_list, format_results
 from modules.plot import plot_results
-
-from tensorflow.keras.optimizers.schedules import ExponentialDecay
 from tensorflow.keras.layers import Input, Dense, LeakyReLU, Lambda, Layer
 from tensorflow.keras.activations import relu, swish
-from tensorflow.keras.metrics import RootMeanSquaredError, MeanAbsolutePercentageError, MeanSquaredError, MeanSquaredLogarithmicError
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import Callback, EarlyStopping
@@ -19,8 +15,11 @@ import tensorflow_probability as tfp
 from timeit import default_timer as timer
 from matplotlib import pyplot as plt
 from tensorflow.python.keras import backend as K
-from tensorflow.keras import activations, initializers, optimizers
-import math
+from tensorflow.keras import activations, initializers
+
+"""
+MLP model for regression in TensorFlow/Keras under development
+"""
 
 np.random.seed(7)
 
@@ -92,61 +91,11 @@ def mean_absolute_percentage_error(y_true, y_pred):
     mape = 100. * K.mean(diff, axis=-1)
     return mape
 
-@tf.autograph.experimental.do_not_convert
-def pred_loss(y_true, y_pred):
-
-    y_true_last = y_true[:-1,]
-    y_true = y_true[1:]
-    y_pred = y_pred[1:]
-
-    true_diff = tf.subtract(y_true, y_true_last)
-    pred_diff = tf.subtract(y_pred, y_true_last)
-
-    true_chg = tf.divide(true_diff, y_true_last)
-    pred_chg = tf.divide(pred_diff, y_true_last)
-
-    true_chg_sign = tf.sign(true_chg)
-    pred_chg_sign = tf.sign(pred_chg)
-
-    sign_tensor = tf.multiply(true_chg_sign, pred_chg_sign)
-    one_n = tf.constant(-1, dtype=tf.float32)
-
-    failed_pred_bools = tf.equal(sign_tensor, one_n)
-    failed_pred_ints = tf.cast(failed_pred_bools, dtype=tf.float32)
-
-    failed_preds = tf.math.multiply(failed_pred_ints, pred_chg)
-    failed_preds = tf.abs(failed_preds)
-    failed_preds = tf.multiply(failed_preds, tf.constant(100, dtype=tf.float32))
-
-    #####################################################################
-
-    failed_true = tf.multiply(failed_pred_ints, y_true)
-    failed_predictions = tf.multiply(failed_pred_ints, y_pred)
-
-    index_nonzero = tf.where(tf.not_equal(failed_true, tf.constant(0, dtype=tf.float32)), None, None)
-    index_nonzero = tf.squeeze(index_nonzero)
-
-    failed_true = tf.gather(failed_true, index_nonzero)
-    failed_predictions = tf.gather(failed_predictions, index_nonzero)
-
-    failed_mse = K.mean(tf.square(tf.subtract(failed_true, failed_predictions)))
-
-    diff = K.abs((y_true - y_pred) / K.clip(K.abs(y_true), K.epsilon(), None))
-    mape = 100. * K.mean(diff)
-
-    failed_diff = K.abs((failed_true - failed_predictions) / K.clip(K.abs(failed_true), K.epsilon(), None))
-    failed_mape = 100. * K.mean(failed_diff, axis=1)
-
-    return failed_mape
-
-    # return K.math_ops.multiply(failed_mape, mape)
-
-
 
 class DenseVariational(Layer):
     def __init__(self, units, kl_weight, activation=None, prior_sigma_1=1.5, prior_sigma_2=0.1, prior_pi=0.5, **kwargs):
+        super(DenseVariational, self).__init__(**kwargs)
         self.units = units
-# Below lines follow hypertuning stats, edit when needed for prior sigma, prior sigma 2, and prior pi
         self.kl_weight = kl_weight
         self.activation = activations.get(activation)
         self.prior_sigma_1 = prior_sigma_1
@@ -155,14 +104,13 @@ class DenseVariational(Layer):
         self.prior_pi_2 = 1.0 - prior_pi
         self.init_sigma = np.sqrt(self.prior_pi_1 * self.prior_sigma_1 ** 2 + self.prior_pi_2 * self.prior_sigma_2 ** 2)
 
-        super().__init__(**kwargs)
-
 # Computes the output shape of layer
     def compute_output_shape(self, input_shape):
         return input_shape[0], self.units
 
-# Defines the kernals and biases
+# Defines the kernels and biases
     def build(self, input_shape):
+        super(DenseVariational, self).build(input_shape)
         self.kernel_mu = self.add_weight(name='kernel_mu', shape=(input_shape[1], self.units),
                                          initializer=initializers.RandomNormal(stddev=self.init_sigma), trainable=True)
         self.bias_mu = self.add_weight(name='bias_mu', shape=(self.units,),
@@ -171,9 +119,7 @@ class DenseVariational(Layer):
                                           initializer=initializers.Constant(0.0), trainable=True)
         self.bias_rho = self.add_weight(name='bias_rho', shape=(self.units,),
                                         initializer=initializers.Constant(0.0), trainable=True)
-        super().build(input_shape)
 
-# Calculations :)
     def call(self, inputs, **kwargs):
         kernel_sigma = tf.math.softplus(self.kernel_rho)
         kernel = self.kernel_mu + kernel_sigma * tf.random.normal(self.kernel_mu.shape)
@@ -185,12 +131,10 @@ class DenseVariational(Layer):
 
         return self.activation(K.dot(inputs, kernel) + bias)
 
-# The variational distribution we will be using, don't change!
     def kl_loss(self, w, mu, sigma):
         variational_dist = tfp.distributions.Normal(mu, sigma)
         return self.kl_weight * K.sum(variational_dist.log_prob(w) - self.log_prior_prob(w))
 
-# The more calculations! Can change depending on how well things go, if so, becareful. Mostly for scaling if necessary
     def log_prior_prob(self, w):
         comp_1_dist = tfp.distributions.Normal(0.0, self.prior_sigma_1)
         comp_2_dist = tfp.distributions.Normal(0.0, self.prior_sigma_2)
@@ -349,8 +293,8 @@ if run == 'custom':
         train_pred = multilayered_perceptron.train_pred
         test_pred = multilayered_perceptron.test_pred
 
-        results = format_results(df, train_pred, test_pred, include_pred_errors)
-        forecast_metrics = metrics_list(results.loc[x_test.index.values], include_pred_errors)
+        results = format_results(df, train_pred, test_pred,)
+        forecast_metrics = metrics_list(results.loc[x_test.index.values])
         errors.loc[t] = forecast_metrics
         epochs_list.append(multilayered_perceptron.epochs)
 
@@ -384,7 +328,7 @@ if run == 'basic':
                 x_transformed = preprocess(x, system)
                 y = pd.DataFrame.to_numpy(df['Close_Next'][:-1])
 
-                x_train, x_test, y_train, y_test = train_test_split(x_transformed, y, shuffle=True, train_size=0.75)
+                x_train, x_test, y_train, y_test = train_test_split(x_transformed, y)
 
                 multilayered_perceptron = MLP()
                 multilayered_perceptron.create_model()
@@ -396,9 +340,9 @@ if run == 'basic':
                 train_pred = multilayered_perceptron.train_pred
                 test_pred = multilayered_perceptron.test_pred
 
-                results = format_results(df, train_pred, test_pred, include_pred_errors)
+                results = format_results(df, train_pred, test_pred)
 
-                forecast_metrics = metrics_list(results.loc[x_test.index.values], include_pred_errors)
+                forecast_metrics = metrics_list(results.loc[x_test.index.values])
                 errors.loc[t] = forecast_metrics
                 epochs.append(multilayered_perceptron.epochs)
 
@@ -437,7 +381,7 @@ if run == 'derived':
                 label = 'Close_Next'
 
                 x_transformed = preprocess(x, system)
-                y = pd.DataFrame.to_numpy(df['Close_Next'][:-1])
+                y = df['Close_Next'][:-1]
 
                 x_transformed = select_features(x_transformed, y, system)
 
@@ -455,9 +399,9 @@ if run == 'derived':
                 train_pred = multilayered_perceptron.train_pred
                 test_pred = multilayered_perceptron.test_pred
 
-                results = format_results(df, train_pred, test_pred, include_pred_errors)
+                results = format_results(df, train_pred, test_pred)
 
-                forecast_metrics = metrics_list(results[train_index], include_pred_errors)
+                forecast_metrics = metrics_list(results[train_index])
                 errors.loc[t] = forecast_metrics
                 epochs.append(multilayered_perceptron.epochs)
 

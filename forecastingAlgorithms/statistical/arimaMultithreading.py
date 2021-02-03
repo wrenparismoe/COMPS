@@ -32,6 +32,9 @@ def gridSearch(data):
     index_min = min(range(len(aic)), key=aic.__getitem__)
     print('The optimal model is: ARIMA{} -AIC{}'.format(parameters[index_min], aic[index_min]))
 
+"""
+Multithreaded ARIMA under progress
+"""
 
 
 system = SystemComponents()

@@ -6,6 +6,7 @@ from preprocessing.feature_engineering.feature_extraction import principal_compo
 from modules.evaluation import metrics_list, format_results
 from modules.plot import plot_results
 from modules.time_process import Timer
+from sklearn.model_selection import train_test_split
 from System import *
 
 
@@ -35,9 +36,9 @@ if run == 'basic':
                 test_pred = model.predict(x_test)
                 test_pred = pd.Series(test_pred, index=test_index, name='pred')
 
-                results = format_results(df, train_pred, test_pred, include_pred_errors)
+                results = format_results(df, train_pred, test_pred)
 
-                forecast_metrics = metrics_list(results.loc[test_index], include_pred_errors)
+                forecast_metrics = metrics_list(results.loc[test_index])
                 errors.loc[t] = forecast_metrics
 
                 if create_plot and t == etf_to_save:
